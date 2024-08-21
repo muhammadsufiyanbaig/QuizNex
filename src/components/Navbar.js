@@ -52,7 +52,7 @@ const Navbar = () => {
                   className="rounded-3xl object-cover"
                 />
               </div>
-              <div className="inline-flex text-xl font-semibold text-gray-900">QuizWiz</div>
+              <div className="inline-flex text-xl font-semibold text-gray-900">Quizzical-Keen</div>
             </Link>
           </div>
 

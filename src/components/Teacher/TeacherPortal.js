@@ -66,7 +66,9 @@ const TeacherPortal = () => {
     const storedTeacherId = localStorage.getItem("TeacherId");
     if (storedTeacherId) {
       try {
-        const response = await axiosInstance.post(`/teacher/portal`, { id: parseInt(storedTeacherId) });
+        const response = await axiosInstance.post(`/teacher/portal`, {
+          id: parseInt(storedTeacherId),
+        });
         setTeacher(response.data);
       } catch (error) {
         console.error("Error fetching teacher data:", error);
@@ -113,7 +115,6 @@ const TeacherPortal = () => {
   };
 
   const handleAddQuestion = () => {
-
     if (!question.question.trim()) {
       setErrorMessage("Please enter a question.");
       return;
@@ -153,7 +154,10 @@ const TeacherPortal = () => {
     if (allQuestions.length > 0) {
       try {
         const TeacherId = localStorage.getItem("TeacherId");
-        const response = await axiosInstance.post("/quiz/addQuestions",{ TeacherId, data: allQuestions });
+        const response = await axiosInstance.post("/quiz/addQuestions", {
+          TeacherId,
+          data: allQuestions,
+        });
         if (response.data.success === true) {
           setIsSuccessModalOpen(true);
           setSuccessMessage(response.data.message);
@@ -212,7 +216,9 @@ const TeacherPortal = () => {
                   </button>
                 </div>
               </>
-            ) : navigate('/teacher/auth/login')}
+            ) : (
+              navigate("/teacher/auth/login")
+            )}
           </div>
         </div>
       )}
@@ -220,15 +226,17 @@ const TeacherPortal = () => {
       <div className="flex-1 overflow-y-auto p-6">
         {/* Main Content */}
         <div className="flex justify-center items-center">
-        <div className="max-w-4xl mx-auto mb-8">
-          <h1 className="text-2xl font-bold mb-4">
-            <strong className="font-black">Current Key:</strong> {currentKey}
-          </h1>
-          <h1 className="text-2xl font-bold mb-4">
-            <strong className="font-black">Secret Code:</strong> QUIZWIZ_TEACHER
-          </h1>
-        </div>
-        <Link to={'/teacher/portal/score'} className="py-2 px-3 bg-teal-600 text-white text-lg rounded-xl">Score</Link>
+          <div className="max-w-4xl mx-auto mb-8">
+            <h1 className="text-2xl font-bold mb-4">
+              <strong className="font-black">Current Key:</strong> {currentKey}
+            </h1>
+          </div>
+          <Link
+            to={"/teacher/portal/score"}
+            className="py-2 px-3 bg-teal-600 text-white text-lg rounded-xl"
+          >
+            Score
+          </Link>
         </div>
         {/* Question Form */}
         <div className="max-w-4xl mx-auto mb-8">
@@ -325,12 +333,12 @@ const TeacherPortal = () => {
               ))}
             </div>
             <div className="flex justify-end">
-            <button
-              className="bg-teal-600 text-white p-2 rounded hover:bg-teal-700 transition duration-200"
-              onClick={handleAddQuestion}
-            >
-              Add Question
-            </button>
+              <button
+                className="bg-teal-600 text-white p-2 rounded hover:bg-teal-700 transition duration-200"
+                onClick={handleAddQuestion}
+              >
+                Add Question
+              </button>
             </div>
           </div>
         </div>
@@ -353,7 +361,6 @@ const TeacherPortal = () => {
                   <th className="px-6 py-3 text-left text-xs font-bold text-teal-600 uppercase tracking-wider">
                     Cancel
                   </th>
-                  
                 </tr>
               </thead>
               <tbody className="bg-gray-50 divide-y divide-gray-200">
