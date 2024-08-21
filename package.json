@@ -18,7 +18,8 @@
     "react-scripts": "5.0.1",
     "react-use-websocket": "^4.8.1",
     "socket.io-client": "^4.7.5",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "react-scripts start",

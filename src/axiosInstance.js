@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-  baseURL: 'https://backend-quizwiz.vercel.app', 
+  baseURL: 'https://backend-quizzical-keen.vercel.app', 
   timeout: 10000, 
   headers: {
     'Content-Type': 'application/json',
