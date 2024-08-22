@@ -15,10 +15,10 @@ const Footer = () => {
                   alt="Logo"
                   width="50"
                   height="50"
-                  className="rounded-3xl object-cover"
+                  className="rounded-xl object-cover h-10 w-10"
                 />
               </div>
-              <div className="inline-flex text-2xl font-medium font-serif text-gray-600">Quizzical-Keen</div>
+              <div className="inline-flex text-2xl font-medium font-serif text-gray-600">QuizNex</div>
             </Link>
           </div>
           <ul className="flex flex-wrap items-center mb-6 text-sm font-medium text-gray-500 sm:mb-0 dark:text-gray-400">

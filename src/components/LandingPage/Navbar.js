@@ -37,7 +37,7 @@ const Navbar = () => {
   };
 
   return (
-    <header className="absolute inset-x-0 top-0 z-50 py-6">
+    <header className="absolute inset-x-0 top-0 z-50 h-14 py-4">
       <div className="mx-auto lg:max-w-[1600px] w-full px-5 sm:px-10 md:px-12 lg:px-5">
         <nav className="w-full flex justify-between gap-6 relative">
           {/* logo */}
@@ -49,10 +49,10 @@ const Navbar = () => {
                   alt="Logo"
                   width="80"
                   height="80"
-                  className="rounded-3xl md:h-16 md:w-16 h-14 w-14 object-cover"
+                  className="rounded-xl md:h-10 md:w-10 h-8 w-8 object-cover"
                 />
               </div>
-              <div className="inline-flex text-2xl font-medium font-serif text-gray-500">Quizzical-Keen</div>
+              <div className="inline-flex text-2xl font-medium font-serif text-gray-500">QuizNex</div>
             </Link>
           </div>
 
@@ -64,15 +64,20 @@ const Navbar = () => {
             className={`flex ${isOpen ? 'visible opacity-100 translate-y-0 scale-y-100' : 'invisible opacity-0 translate-y-10 overflow-hidden'
               } lg:visible lg:opacity-100 lg:-translate-y-0 lg:scale-y-100 duration-300 ease-linear flex-col gap-y-6 gap-x-4 lg:flex-row w-full lg:justify-between lg:items-center absolute lg:relative top-full lg:top-0 bg-white lg:!bg-transparent border-x border-x-gray-100 lg:border-x-0`}
           >
-            <ul className="border-t border-gray-100 lg:border-t-0 px-6 lg:px-0 pt-6 lg:pt-0 flex flex-col lg:flex-row gap-y-4 gap-x-3 text-lg text-gray-700 w-full lg:justify-center lg:items-center">
+            <ul className="border-t border-gray-100 lg:border-t-0 px-6 lg:px-0 pt-6 lg:pt-0 flex flex-col lg:flex-row gap-y-4 gap-x-3 lg:space-x-7 text-lg text-gray-700 w-full lg:justify-center lg:items-center">
               <li>
                 <Link to="#aboutus" className="duration-300 text-gray-700 font-medium ease-linear hover:text-teal-600 py-3">
                   About us
                 </Link>
               </li>
               <li>
-                <Link to="/teacher" className="duration-300 text-gray-700 font-medium ease-linear hover:text-teal-600 py-3">
-                  Teacher
+                <Link to="#contact" className="duration-300 text-gray-700 font-medium ease-linear hover:text-teal-600 py-3">
+                  Features
+                </Link>
+              </li>
+              <li>
+                <Link to="#contact" className="duration-300 text-gray-700 font-medium ease-linear hover:text-teal-600 py-3">
+                  Contact Us
                 </Link>
               </li>
             </ul>

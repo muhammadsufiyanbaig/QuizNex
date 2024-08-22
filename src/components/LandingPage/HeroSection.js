@@ -14,7 +14,7 @@ const HeroSection = () => {
             <h1 className="text-3xl sm:text-4xl md:text-5xl xl:text-6xl font-bold text-gray-900">
               Challenge your <span className="block py-2"> mind with </span>
               <span className="text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 via-teal-500 to-teal-800">
-                Quizzical-Keen
+                QuizNex
               </span>
             </h1>
             <p className="mt-8 text-gray-700 text-lg max-w-96">
