@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../axiosInstance";
 import { useNavigate } from "react-router-dom";
-import Navbar from "./Navbar";
+
 
 const Quiz = () => {
   const navigate = useNavigate();
@@ -197,7 +197,6 @@ const Quiz = () => {
   }, []);
   return (
     <div className="bg-gray-50 min-h-screen">
-      <Navbar />
       <div className="mb-4 text-center">
         {!quizEnded && (
           <p className="text-teal-500 font-bold text-4xl text-end pr-5">

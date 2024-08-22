@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+.bg-contact {
+    background-image: url('./utils/assets/contact.jpg');
+    background-size: cover;
+    background-position: center;
+  }
