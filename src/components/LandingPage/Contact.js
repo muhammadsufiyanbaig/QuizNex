@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import axiosInstance from "../../axiosInstance"; 
 
 const Email = () => (
   <svg
@@ -36,6 +37,29 @@ const Call = () => (
 );
 
 const Contact = () => {
+  const [formData, setFormData] = useState({
+    senderName: "",
+    senderEmail: "",
+    message: "",
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axiosInstance.post("/contact/send-email", formData);
+      alert("Message sent successfully!");
+      setFormData({ senderName: "", senderEmail: "", message: "" });
+    } catch (error) {
+      console.log(error);
+      alert("Failed to send message. Please try again later.");
+    }
+  };
+
   return (
     <section className="py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -48,23 +72,29 @@ const Contact = () => {
               <h2 className="text-gray-900 font-manrope text-4xl font-semibold leading-10 mb-9 lg:text-left text-center">
                 Reach Out To Us
               </h2>
-              <form action="">
+              <form onSubmit={handleSubmit}>
                 <input
                   type="text"
+                  name="senderName"
+                  value={formData.senderName}
+                  onChange={handleChange}
                   className="w-full h-14 shadow-sm text-gray-600 placeholder-text-400 text-lg font-normal leading-7 rounded-lg border border-gray-200 focus:outline-none py-2 px-4 mb-8"
                   placeholder="Name"
                 />
                 <input
                   type="email"
+                  name="senderEmail"
+                  value={formData.senderEmail}
+                  onChange={handleChange}
                   className="w-full h-14 shadow-sm text-gray-600 placeholder-text-400 text-lg font-normal leading-7 rounded-lg border border-gray-200 focus:outline-none py-2 px-4 mb-8"
                   placeholder="Email"
                 />
                 <textarea
-                  name=""
-                  id="text"
+                  name="message"
+                  value={formData.message}
+                  onChange={handleChange}
                   className="w-full h-48 shadow-sm resize-none text-gray-600 placeholder-text-400 text-lg font-normal leading-7 rounded-xl border border-gray-200 focus:outline-none px-4 py-4 mb-8"
                   placeholder="Message"
-                  defaultValue={""}
                 />
                 <button className="w-full h-12 text-center text-white text-base font-semibold leading-6 rounded-xl bg-teal-600 shadow transition-all duration-700 hover:bg-teal-800">
                   Submit
@@ -73,7 +103,7 @@ const Contact = () => {
             </div>
           </div>
           <div
-            className={`lg:max-w-xl w-full h-96 md:h-[600px] flex items-center justify-center rounded-lg  bg-contact`}
+            className={`lg:max-w-xl w-full h-96 md:h-[600px] flex items-center justify-center rounded-lg bg-contact`}
           >
             <div className="">
               <div className="lg:w-96 w-auto h-auto rounded-lg bg-white shadow-xl lg:p-6 p-4">
