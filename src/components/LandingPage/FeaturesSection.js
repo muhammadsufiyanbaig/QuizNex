@@ -1,24 +1,24 @@
 import React from 'react';
 
 const features = [
-  {
-    title: 'Growth',
-    description: 'Easily track and measure your progress with detailed analytics and insights.',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-      </svg>
-    ),
-  },
-  {
-    title: 'Security',
-    description: 'Ensure a secure testing environment with robust security measures in place.',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-      </svg>
-    ),
-  },
+  // {
+  //   title: 'Growth',
+  //   description: 'Easily track and measure your progress with detailed analytics and insights.',
+  //   icon: (
+  //     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+  //     </svg>
+  //   ),
+  // },
+  // {
+  //   title: 'Security',
+  //   description: 'Ensure a secure testing environment with robust security measures in place.',
+  //   icon: (
+  //     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+  //     </svg>
+  //   ),
+  // },
   {
     title: 'Cloud',
     description: 'Store and access your quizzes and data securely in our database through teacher portal.',
@@ -46,20 +46,20 @@ const features = [
       </svg>
     ),
   },
-  {
-    title: 'Dark Mode',
-    description: 'Switch to dark mode for a comfortable viewing experience in low light conditions.',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-      </svg>
-    ),
-  },
+  // {
+  //   title: 'Dark Mode',
+  //   description: 'Switch to dark mode for a comfortable viewing experience in low light conditions.',
+  //   icon: (
+  //     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+  //     </svg>
+  //   ),
+  // },
 ];
 
 const FeaturesSection = () => {
   return (
-    <div className="bg-white py-6 sm:py-8 lg:py-12">
+    <div id='features' className="bg-white py-6 sm:py-8 lg:py-12">
       <div className="mx-auto max-w-screen-2xl px-4 md:px-8">
         {/* Text */}
         <div className="mb-10 md:mb-16">

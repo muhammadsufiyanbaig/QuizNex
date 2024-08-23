@@ -66,23 +66,21 @@ const Navbar = () => {
           >
             <ul className="border-t border-gray-100 lg:border-t-0 px-6 lg:px-0 pt-6 lg:pt-0 flex flex-col lg:flex-row gap-y-4 gap-x-3 lg:space-x-7 text-lg text-gray-700 w-full lg:justify-center lg:items-center">
               <li>
-                <Link to="#aboutus" className="duration-300 text-gray-700 font-medium ease-linear hover:text-teal-600 py-3">
+                <a href='#about' className="duration-300 text-gray-700 font-medium ease-linear hover:text-teal-600 py-3">
                   About us
-                </Link>
+                </a>
               </li>
               <li>
-                <Link to="#contact" className="duration-300 text-gray-700 font-medium ease-linear hover:text-teal-600 py-3">
+                <a href='#features' className="duration-300 text-gray-700 font-medium ease-linear hover:text-teal-600 py-3">
                   Features
-                </Link>
+                </a>
               </li>
               <li>
-                <Link to="#contact" className="duration-300 text-gray-700 font-medium ease-linear hover:text-teal-600 py-3">
+                <a href='#contact' className="duration-300 text-gray-700 font-medium ease-linear hover:text-teal-600 py-3">
                   Contact Us
-                </Link>
+                </a>
               </li>
             </ul>
-
-            
               <div className="lg:min-w-max flex items-center sm:w-max w-full pb-6 lg:pb-0 border-b border-gray-100 lg:border-0 px-6 lg:px-0">
                 <button
                   to= {role === 'user'? "/portal": role === "teacher" ? "/teacher/portal" :"/auth/login"}
