@@ -13,6 +13,7 @@ import NoPage from "./components/NoPage";
 import LandingPage from "./components/LandingPage";
 import Portal from "./components/User/Portal";
 import Score from "./components/Teacher/Score";
+import OTP from "./components/reuseableComponent/OTP";
 // import Navbar from "./components/Navbar";
 
 const App = () => {
@@ -21,6 +22,7 @@ const App = () => {
         <Route path="/" element={<LandingPage />} />
         <Route path="auth" element={<Login />} />
         <Route path="auth/login" element={<Login />} />
+        <Route path="auth/otp" element={<OTP />} />
         <Route path="auth/signup" element={<SignUp />} />
         <Route
           path="testkey"

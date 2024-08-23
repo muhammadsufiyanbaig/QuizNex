@@ -59,12 +59,16 @@ const SignUp = () => {
     try {
       const response = await axiosInstance.post("/user/signup", formData);
       console.log("Signup success:", response.data);
-      alert("Your account is created successfully");
-      navigate('/auth/login');
+      localStorage.setItem('emailForOTP', formData.email);
+      localStorage.setItem('isUser', true);
+      await axiosInstance.post("/otp/request", { email: formData.email });
+      alert("Your account is created successfully. Please verify your email.");
+      navigate('/auth/otp');
     } catch (error) {
       console.error("Signup error:", error.response.data);
       setError(error.response.data.message);
     }
+    
   };
 
   return (

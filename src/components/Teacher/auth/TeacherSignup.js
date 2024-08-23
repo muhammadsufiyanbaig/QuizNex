@@ -66,8 +66,10 @@ const TeacherSignUp = () => {
     try {
      const response = await axiosInstance.post("/teacher/signup",formData);
       console.log("Signup success:", response.data);
-      alert("Your account is created successfully");
-      navigate("/teacher/auth/login");
+      localStorage.setItem('emailForOTP', formData.email);
+      await axiosInstance.post("/otp/request", { email: formData.email });
+      alert("Your account is created successfully. Please verify your email.");
+      navigate("/auth/otp");
     } catch (error) {
       console.error("Signup error:", error.response.data);
       setError(error.response.data.message);

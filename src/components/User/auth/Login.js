@@ -35,8 +35,8 @@ const Login = () => {
       console.log("Login success:", response.data);
 
       localStorage.setItem("userId", response.data.id);
-      // Set a timeout to remove TeacherId after 1 hour (3600000 ms)
-
+      localStorage.removeItem('emailForOTP');
+      localStorage.removeItem('isUser');
       navigate("/testkey");
     } catch (error) {
       console.error("Login error:", error.response?.data || error.message);
