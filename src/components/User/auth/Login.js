@@ -31,7 +31,7 @@ const Login = () => {
     }
     try {
       document.cookie.replace("token", "");
-      const response = await axiosInstance.post("/user/login",formData);
+      const response = await axiosInstance.post("/user/login",formData, {withCredentials: true});
       console.log("Login success:", response.data);
 
       localStorage.setItem("userId", response.data.id);
@@ -43,9 +43,9 @@ const Login = () => {
       setError(error.response?.data?.message || "Invaild Email or Password");
     }
   };
-  setTimeout(() => {
+
     localStorage.removeItem("userId");
-  }, 60 * 60 * 1000);
+
   return (
     <>
       <div className="flex min-h-screen flex-col justify-center items-center px-6 py-12 lg:px-8">

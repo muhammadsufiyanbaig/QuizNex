@@ -11,7 +11,7 @@ const Portal = () => {
     const fetchUserData = async () => {
       const id = localStorage.getItem('userId');
       try {
-        const response = await axiosInstance.post('/user/portal', { id });
+        const response = await axiosInstance.post('/user/portal', { id }, {withCredentials: true});
         setUser(response.data);
       } catch (error) {
         console.error('Error fetching user data:', error);

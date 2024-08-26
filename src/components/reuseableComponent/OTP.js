@@ -98,7 +98,7 @@ const OTP = () => {
                 <div className="flex flex-col space-y-16">
                   <div className="flex flex-row items-center justify-between mx-auto w-full max-w-lg">
                     {otp.map((_, index) => (
-                      <div key={index} className="w-16 h-16">
+                      <div key={index} className="w-14 h-14">
                         <input
                           className="w-full h-full flex flex-col items-center justify-center text-center px-5 outline-none rounded-xl border border-gray-200 text-lg bg-white focus:bg-gray-50 focus:ring-1 ring-teal-700"
                           type="text"

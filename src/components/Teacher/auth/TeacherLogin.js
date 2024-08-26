@@ -30,7 +30,7 @@ const TeacherLogin = () => {
       return;
     }
     try {
-      const response = await axiosInstance.post("/teacher/login",formData);
+      const response = await axiosInstance.post("/teacher/login",formData, {withCredentials: true});
 
       if (response.data.error === "Invalid credentials") {
         alert("Invalid email or password!");
@@ -49,9 +49,9 @@ const TeacherLogin = () => {
       setError(error.response?.data?.message || "Invaild Email or Password");
     }
   };
-  setTimeout(() => {
-    localStorage.clear();
-  }, 60* 60 * 1000);
+  // setTimeout(() => {
+  //   localStorage.clear();
+  // }, 60* 60 * 1000);
   return (
     <>
       <div className="flex min-h-screen flex-col justify-center items-center px-6 py-12 lg:px-8">
