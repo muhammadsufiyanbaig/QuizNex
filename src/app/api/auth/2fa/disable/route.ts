@@ -47,6 +47,12 @@ export async function DELETE(req: NextRequest) {
   }
 
   // Verify password
+  if (!user.passwordHash) {
+    return NextResponse.json(
+      { error: "OAuth accounts cannot disable 2FA with a password." },
+      { status: 400 }
+    );
+  }
   const passwordValid = await verifyPassword(parsed.data.password, user.passwordHash);
   if (!passwordValid) {
     return NextResponse.json(

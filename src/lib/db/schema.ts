@@ -77,8 +77,8 @@ export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
-  role: roleEnum("role").notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }),  // null for OAuth users
+  role: roleEnum("role"),                                    // null until selected (new OAuth users)
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: varchar("image", { length: 500 }),
   twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
@@ -420,4 +420,42 @@ export const invitationsRelations = relations(invitations, ({ one }) => ({
     fields: [invitations.classroomId],
     references: [classrooms.id],
   }),
+}));
+
+// ── Passkey (WebAuthn credentials) ───────────────────
+export const passkeys = pgTable("passkeys", {
+  id:           uuid("id").primaryKey().defaultRandom(),
+  userId:       uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  credentialId: text("credential_id").notNull().unique(),
+  publicKey:    text("public_key").notNull(),          // base64url-encoded Uint8Array
+  counter:      integer("counter").notNull().default(0),
+  deviceType:   varchar("device_type", { length: 32 }), // singleDevice | multiDevice
+  backedUp:     boolean("backed_up").default(false).notNull(),
+  transports:   text("transports"),                    // JSON: AuthenticatorTransportFuture[]
+  name:         varchar("name", { length: 100 }).notNull().default("Passkey"),
+  createdAt:    timestamp("created_at").defaultNow().notNull(),
+  lastUsedAt:   timestamp("last_used_at"),
+});
+
+// ── WebAuthn Challenge (temp storage, 5-min expiry) ──
+export const webauthnChallenges = pgTable("webauthn_challenges", {
+  id:        uuid("id").primaryKey().defaultRandom(),
+  challenge: text("challenge").notNull(),
+  userId:    uuid("user_id").references(() => users.id, { onDelete: "cascade" }), // null for login
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Passkey One-Time Token (issued after auth verify) ─
+export const passkeyTokens = pgTable("passkey_tokens", {
+  id:        uuid("id").primaryKey().defaultRandom(),
+  userId:    uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token:     varchar("token", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt:    timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const passkeysRelations = relations(passkeys, ({ one }) => ({
+  user: one(users, { fields: [passkeys.userId], references: [users.id] }),
 }));

@@ -32,7 +32,7 @@ function isPublic(pathname: string): boolean {
 }
 
 type AuthUser = {
-  role?: Role;
+  role?: Role | null;
   twoFactorEnabled?: boolean;
   name?: string | null;
   email?: string | null;
@@ -44,7 +44,7 @@ type AuthUser = {
  * Used by both proxy.ts (Edge) and the full auth.ts (Node.js).
  */
 export const authConfig: NextAuthConfig = {
-  providers: [],   // providers are added in auth.ts (Node.js only)
+  providers: [],
 
   pages: {
     signIn: "/login",
@@ -57,80 +57,83 @@ export const authConfig: NextAuthConfig = {
     authorized({ auth, request: { nextUrl } }) {
       const { pathname } = nextUrl;
       const user = auth?.user as AuthUser | undefined;
+      const isAuthenticated = !!user;
+      const hasRole = !!user?.role;
+      const has2FA  = !!user?.twoFactorEnabled;
 
-      // Allow static assets
+      // Static assets — always allow
       if (
         pathname.startsWith("/_next") ||
         pathname.startsWith("/public") ||
         pathname === "/favicon.ico"
-      ) {
+      ) return true;
+
+      // ── /setup-role: only for authenticated users without a role ──
+      if (pathname === "/setup-role") {
+        if (!isAuthenticated) return Response.redirect(new URL("/login", nextUrl));
+        if (hasRole) {
+          // Role already set — move to next step
+          return Response.redirect(
+            new URL(has2FA ? ROLE_HOME[user!.role!] : "/setup-2fa", nextUrl)
+          );
+        }
         return true;
       }
 
-      // ── /setup-2fa: onboarding gate ──────────────────────────────
+      // ── /setup-2fa: only for authenticated users with role but no 2FA ──
       if (pathname === "/setup-2fa") {
-        if (!user?.role) {
-          // Not authenticated → send to login
-          return Response.redirect(new URL("/login", nextUrl));
-        }
-        if (user.twoFactorEnabled) {
-          // Already has 2FA → go to dashboard
-          return Response.redirect(new URL(ROLE_HOME[user.role!], nextUrl));
-        }
-        // Authenticated + no 2FA → allow
+        if (!isAuthenticated) return Response.redirect(new URL("/login", nextUrl));
+        if (!hasRole) return Response.redirect(new URL("/setup-role", nextUrl));
+        if (has2FA) return Response.redirect(new URL(ROLE_HOME[user!.role!], nextUrl));
         return true;
       }
 
       // ── Root redirect ─────────────────────────────────────────────
       if (pathname === "/") {
-        if (!user?.role) return Response.redirect(new URL("/login", nextUrl));
-        if (!user.twoFactorEnabled) return Response.redirect(new URL("/setup-2fa", nextUrl));
-        return Response.redirect(new URL(ROLE_HOME[user.role], nextUrl));
+        if (!isAuthenticated) return Response.redirect(new URL("/login", nextUrl));
+        if (!hasRole)  return Response.redirect(new URL("/setup-role", nextUrl));
+        if (!has2FA)   return Response.redirect(new URL("/setup-2fa", nextUrl));
+        return Response.redirect(new URL(ROLE_HOME[user!.role!], nextUrl));
       }
 
       // ── Public auth pages ─────────────────────────────────────────
       if (isPublic(pathname)) {
-        if (user?.role && !pathname.startsWith("/api")) {
-          // Authenticated but no 2FA → must complete onboarding
-          if (!user.twoFactorEnabled) {
-            return Response.redirect(new URL("/setup-2fa", nextUrl));
-          }
-          return Response.redirect(new URL(ROLE_HOME[user.role], nextUrl));
+        if (isAuthenticated && !pathname.startsWith("/api")) {
+          if (!hasRole)  return Response.redirect(new URL("/setup-role", nextUrl));
+          if (!has2FA)   return Response.redirect(new URL("/setup-2fa", nextUrl));
+          return Response.redirect(new URL(ROLE_HOME[user!.role!], nextUrl));
         }
         return true;
       }
 
-      // ── Protected pages ───────────────────────────────────────────
-      if (!user?.role) {
+      // ── Protected dashboard pages ─────────────────────────────────
+      if (!isAuthenticated) {
         const loginUrl = new URL("/login", nextUrl);
         loginUrl.searchParams.set("callbackUrl", pathname);
         return Response.redirect(loginUrl);
       }
-
-      // Must complete 2FA onboarding before accessing any dashboard page
-      if (!user.twoFactorEnabled) {
-        return Response.redirect(new URL("/setup-2fa", nextUrl));
-      }
+      if (!hasRole)  return Response.redirect(new URL("/setup-role", nextUrl));
+      if (!has2FA)   return Response.redirect(new URL("/setup-2fa", nextUrl));
 
       // Wrong role → own home
-      const allowed = ROLE_ALLOWED_PREFIXES[user.role!];
+      const allowed = ROLE_ALLOWED_PREFIXES[user!.role!];
       if (!allowed?.some((prefix) => pathname.startsWith(prefix))) {
-        return Response.redirect(new URL(ROLE_HOME[user.role!], nextUrl));
+        return Response.redirect(new URL(ROLE_HOME[user!.role!], nextUrl));
       }
 
       return true;
     },
 
+    // Minimal edge-safe JWT callback — full version is in auth.ts
     async jwt({ token, user, trigger, session }) {
-      // Initial sign-in — hydrate token from the user object
       if (user) {
         token.id               = user.id as string;
-        token.role             = (user as { role: Role }).role;
+        token.role             = (user as { role: Role | null }).role ?? null;
         token.twoFactorEnabled = (user as { twoFactorEnabled: boolean }).twoFactorEnabled ?? false;
       }
-      // Client-side update() call — e.g. after enabling 2FA
-      if (trigger === "update" && session?.twoFactorEnabled !== undefined) {
-        token.twoFactorEnabled = session.twoFactorEnabled as boolean;
+      if (trigger === "update") {
+        if (session?.twoFactorEnabled !== undefined) token.twoFactorEnabled = session.twoFactorEnabled;
+        if (session?.role !== undefined)             token.role             = session.role;
       }
       return token;
     },
@@ -138,8 +141,8 @@ export const authConfig: NextAuthConfig = {
     async session({ session, token }) {
       if (token) {
         session.user.id               = token.id as string;
-        session.user.role             = token.role as Role;
-        session.user.twoFactorEnabled = token.twoFactorEnabled as boolean ?? false;
+        session.user.role             = (token.role as Role | null) ?? null;
+        session.user.twoFactorEnabled = (token.twoFactorEnabled as boolean) ?? false;
       }
       return session;
     },

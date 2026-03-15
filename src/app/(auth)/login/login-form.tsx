@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
+  KeyRound,
   Loader2,
   LogIn,
   Mail,
@@ -17,6 +18,7 @@ import {
   ShieldCheck,
   Zap,
 } from "lucide-react";
+import { startAuthentication } from "@simplewebauthn/browser";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -46,6 +48,8 @@ export default function LoginForm() {
   const [resendSent, setResendSent] = useState(false);
   const [resending, setResending]   = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [passkeyError, setPasskeyError]     = useState<string | null>(null);
 
   // Keep credentials in a ref so we can reuse them in step 2
   const credsRef = useRef<LoginInput | null>(null);
@@ -129,6 +133,52 @@ export default function LoginForm() {
     }
   }
 
+  async function handlePasskeySignIn() {
+    setPasskeyLoading(true);
+    setPasskeyError(null);
+    try {
+      // 1. Get options
+      const optRes  = await fetch("/api/auth/passkey/auth/options", { method: "POST" });
+      const optJson = await optRes.json();
+      if (!optRes.ok) { setPasskeyError(optJson.error ?? "Failed to start passkey sign-in."); return; }
+
+      // 2. Browser prompt
+      let authResponse;
+      try {
+        authResponse = await startAuthentication({ optionsJSON: optJson.options });
+      } catch (e) {
+        setPasskeyError(`Cancelled: ${(e as Error).message}`);
+        return;
+      }
+
+      // 3. Verify
+      const verRes  = await fetch("/api/auth/passkey/auth/verify", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ challengeId: optJson.challengeId, response: authResponse }),
+      });
+      const verJson = await verRes.json();
+      if (!verRes.ok) { setPasskeyError(verJson.error ?? "Passkey verification failed."); return; }
+
+      // 4. Sign in with the one-time token
+      const result = await signIn("credentials", {
+        passkeyToken: verJson.passkeyToken,
+        email:        "",
+        password:     "",
+        redirect:     false,
+      });
+
+      if (!result?.error) {
+        router.push(callbackUrl);
+        router.refresh();
+      } else {
+        setPasskeyError("Sign-in failed after passkey verification.");
+      }
+    } finally {
+      setPasskeyLoading(false);
+    }
+  }
+
   const isLoading = isSubmitting || submitting;
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -191,6 +241,35 @@ export default function LoginForm() {
           </div>
         ))}
       </div>
+
+      {/* Passkey sign-in */}
+      {step === "credentials" && (
+        <div className="mb-4">
+          {passkeyError && (
+            <div className="mb-3 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
+              <span>✕</span> {passkeyError}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handlePasskeySignIn}
+            disabled={passkeyLoading || isLoading}
+            className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-white/15 bg-white/5 py-3 text-sm font-medium text-slate-200 transition-all duration-200 hover:border-white/25 hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {passkeyLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <KeyRound className="h-4 w-4 text-blue-400" />
+            )}
+            {passkeyLoading ? "Waiting for passkey…" : "Sign in with passkey"}
+          </button>
+          <div className="mt-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-white/10" />
+            <span className="text-xs text-slate-500">or use email</span>
+            <div className="h-px flex-1 bg-white/10" />
+          </div>
+        </div>
+      )}
 
       {/* Card */}
       <div className="glass-card rounded-2xl p-8 shadow-2xl shadow-black/40">
@@ -323,10 +402,45 @@ export default function LoginForm() {
           </form>
         )}
 
-        {/* Register link — only on step 1 */}
+        {/* OAuth + register — only on step 1 */}
         {step === "credentials" && (
           <>
-            <div className="my-6 flex items-center gap-3">
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-xs text-slate-500">or continue with</span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* Google */}
+              <button
+                type="button"
+                onClick={() => signIn("google", { callbackUrl: "/" })}
+                className="flex items-center justify-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-white/20 hover:bg-white/10 hover:text-white"
+              >
+                <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Google
+              </button>
+
+              {/* Apple */}
+              <button
+                type="button"
+                onClick={() => signIn("apple", { callbackUrl: "/" })}
+                className="flex items-center justify-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-white/20 hover:bg-white/10 hover:text-white"
+              >
+                <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
+                </svg>
+                Apple
+              </button>
+            </div>
+
+            <div className="mt-5 flex items-center gap-3">
               <div className="h-px flex-1 bg-white/10" />
               <span className="text-xs text-slate-500">New to QuizNex?</span>
               <div className="h-px flex-1 bg-white/10" />

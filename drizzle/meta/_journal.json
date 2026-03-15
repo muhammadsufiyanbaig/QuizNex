@@ -22,6 +22,20 @@
       "when": 1773609747045,
       "tag": "0002_useful_lady_ursula",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773611772521,
+      "tag": "0003_tough_killmonger",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1773612742865,
+      "tag": "0004_motionless_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }
