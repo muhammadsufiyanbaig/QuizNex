@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #05050f;
+  --foreground: #e2e8f0;
 }
 
 @theme inline {
@@ -12,15 +12,105 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0a0a1a; }
+::-webkit-scrollbar-thumb { background: #1d4ed8; border-radius: 3px; }
+
+/* ── Misc utility animations ────────────────────────────── */
+@keyframes shrink {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+/* ── Animated Gradient Orbs (auth background) ──────────── */
+@keyframes float-slow {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(30px, -40px) scale(1.05); }
+  66%       { transform: translate(-20px, 20px) scale(0.97); }
+}
+
+@keyframes float-medium {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%       { transform: translate(-40px, 30px) scale(1.08); }
+}
+
+@keyframes float-fast {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%       { transform: translate(20px, -20px) scale(0.95); }
+  75%       { transform: translate(-15px, 15px) scale(1.03); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes pulse-ring {
+  0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59,130,246,0.4); }
+  70%  { transform: scale(1);    box-shadow: 0 0 0 10px rgba(59,130,246,0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.orb-1 { animation: float-slow   18s ease-in-out infinite; }
+.orb-2 { animation: float-medium 14s ease-in-out infinite; }
+.orb-3 { animation: float-fast   10s ease-in-out infinite; }
+
+.animate-fade-in-up  { animation: fade-in-up 0.5s ease forwards; }
+.animate-shimmer     { animation: shimmer 3s linear infinite; }
+.animate-pulse-ring  { animation: pulse-ring 2s ease infinite; }
+
+/* ── Gradient text ─────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glass card ────────────────────────────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── Input focus glow ──────────────────────────────────── */
+.input-glow:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.7);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* ── Blue gradient button ──────────────────────────────── */
+.btn-gradient {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #60a5fa 100%);
+  background-size: 200% auto;
+  transition: background-position 0.4s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-gradient:hover {
+  background-position: right center;
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+.btn-gradient:active {
+  transform: translateY(0);
 }

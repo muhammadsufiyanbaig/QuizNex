@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/I-TECH/OneDrive/Desktop/Projects/Applications/**)",
+      "Bash(cp -r quiznex-temp/. QuizNex/)",
+      "Bash(rm -rf quiznex-temp)"
+    ]
+  }
+}

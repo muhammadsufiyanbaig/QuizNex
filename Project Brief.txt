@@ -1,0 +1,17 @@
+QuizNex:
+Quiz Nex ek assa platform hy jis mein basically 3 roles hy:
+1. Student
+2. Teacher
+3. Organization
+Teacher jo wo apny classrooms waha per create ker sakta hy wo har classroom ki ek unique key ho gi jo wo Students ko provide keryga or wo students ko manually bhi add ker sakta  hy emails ke through warna unko email ke through invitation bhi bhej sakt hy us classroom per wo multiple quizzes ko ly sakta hy or jessy hi quiz start hoga to timer start ho jay ga or student ki screen full ho jay gi or wo koi si bhi special key ko press nhi ker sakta like any special key or function keys or esc waghera agar kisi terha quiz ke bich mein sy full screen ko hata dyta hy to us ka quiz wahi per hi end kerdo or again apna quiz start kery ga but jab wo apna quiz start keryga to us ka timer wahi sy start hoga jaha per us ny full screen ko escape kia tha. Or bhi is mein ye functionality mein rakhna chahta hun ke teachers classrooms mein har quiz wise student ke marks ko dekh sakta hy or un ke tammam answers or wo ye bhi dekh sakta hy ke konsy student ny kis question per sub sy zyada time lagaya hy or us ko kuch analytics bhi dekho jo classroom or quiz or student wise hongy or during the quiz student ka camera bhi on kerwa dyna or ye check kerna ke unki eyes kahi screen sy hat to nhi rahi agar us ki frequncey 1 min 10 times hy to us ka quiz end kerdyna or us ko fail consider kerna I think is feature ke liye tanserflow JS ka us ker sakty ho. Acha or ek chiz wo ye ke teachers ko AI agent bhi provide kerna wo ye ke Jab teacher quiz bana raha ho bhaly wo MCQs based ho ya questions answer based to teacher jo topic enter kery to us ke according unko questions suggest kery answers ke sath ab wo teacher per hy ko un questions ko add kerty hyn ya nhi or is agent ka ek or ye feature do ke teacher apni slides or lecture PDF/Docs/Text/PPT form agar upload keryn to unko us sy questions bana kerdy dy. Acha ab organization per aaty hyn to mein srif ye hi ke organization jo teachers ko apny pass add ker sakta ho baki sari functionality wasy hi rahy gi teacher or students ki organization hn teachers ko dekh sakta ho manage kersata ho students waghera dekh sakta ho or meaningful analytics dekh sakta ho.
+
+Tech stack: 
+
+Next.js 
+Neon DB
+Zustand
+Zod
+Langchain or Langgraph with Gemini Model
+Cloudinary for storage purpose PPT or PDF
+
+
