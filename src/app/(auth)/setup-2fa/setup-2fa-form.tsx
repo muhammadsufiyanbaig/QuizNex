@@ -45,7 +45,8 @@ export default function Setup2FAForm() {
   const [showSecret, setShowSecret]   = useState(false);
   const [copied, setCopied]           = useState(false);
 
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const inputRefs    = useRef<(HTMLInputElement | null)[]>([]);
+  const hasRedirected = useRef(false);
 
   // Fetch QR code on mount
   useEffect(() => {
@@ -75,12 +76,13 @@ export default function Setup2FAForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [digits]);
 
-  // After success, update session then navigate
+  // After success, update session then navigate — guarded by ref so it runs exactly once
   useEffect(() => {
-    if (!done) return;
+    if (!done || hasRedirected.current) return;
+    hasRedirected.current = true;
+    const role = session?.user?.role ?? "STUDENT";
     (async () => {
       await update({ twoFactorEnabled: true });
-      const role = session?.user?.role ?? "STUDENT";
       router.push(ROLE_HOME[role] ?? "/student");
     })();
   }, [done, session, update, router]);

@@ -68,6 +68,18 @@ export const aiDocumentFileTypeEnum = pgEnum("ai_document_file_type", [
   "PPT",
 ]);
 
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "QUIZ_STARTED",
+  "QUIZ_RESULT",
+  "CLASSROOM_INVITE",
+  "STUDENT_JOINED",
+  "STUDENT_FLAGGED",
+  "ORG_INVITE",
+  "ORG_INVITE_ACCEPTED",
+  "ORG_INVITE_DECLINED",
+  "STUDENT_REMOVED",
+]);
+
 // ─────────────────────────────────────────────
 // Tables
 // ─────────────────────────────────────────────
@@ -458,4 +470,20 @@ export const passkeyTokens = pgTable("passkey_tokens", {
 
 export const passkeysRelations = relations(passkeys, ({ one }) => ({
   user: one(users, { fields: [passkeys.userId], references: [users.id] }),
+}));
+
+// ── Notifications ──────────────────────────────
+export const notifications = pgTable("notifications", {
+  id:        uuid("id").primaryKey().defaultRandom(),
+  userId:    uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type:      notificationTypeEnum("type").notNull(),
+  title:     varchar("title", { length: 255 }).notNull(),
+  body:      text("body").notNull(),
+  link:      varchar("link", { length: 500 }),
+  isRead:    boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
 }));
