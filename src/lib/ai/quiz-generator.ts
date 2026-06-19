@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { HumanMessage, SystemMessage, AIMessage, BaseMessage } from "@langchain/core/messages";
-import { geminiFlash } from "./gemini";
+import { claude } from "./claude";
 
 // ─── Zod Schemas ─────────────────────────────────────────────────────────────
 
@@ -64,12 +64,9 @@ type GenerateResult = {
 
 function quizTypeDescription(quizType: "MCQ" | "QA" | "MIXED"): string {
   switch (quizType) {
-    case "MCQ":
-      return "Multiple Choice Questions only";
-    case "QA":
-      return "Written Answer Questions only";
-    case "MIXED":
-      return "Mixed: roughly half MCQ and half QA";
+    case "MCQ":  return "Multiple Choice Questions only";
+    case "QA":   return "Written Answer Questions only";
+    case "MIXED": return "Mixed: roughly half MCQ and half QA";
   }
 }
 
@@ -94,7 +91,7 @@ function buildSystemPromptForDocument(
   count: number,
   difficulty: "EASY" | "MEDIUM" | "HARD"
 ): string {
-  return `You are an expert educator. Analyze the provided document and extract quiz questions from its content.
+  return `You are an expert educator. Analyze the provided document content and generate quiz questions from it.
 Generate exactly ${count} questions at ${difficulty} difficulty level.
 Quiz type: ${quizTypeDescription(quizType)}
 - MCQ: 4 options, exactly 1 isCorrect=true. Marks: 1-5 based on complexity.
@@ -104,11 +101,49 @@ Focus on key concepts, facts, and understanding from the document.
 Return exactly the specified number of questions.`;
 }
 
+const JSON_SCHEMA_HINT = `{
+  "questions": [
+    { "type": "MCQ", "text": "Question text", "marks": 2, "options": [{"text": "A", "isCorrect": true}, {"text": "B", "isCorrect": false}, {"text": "C", "isCorrect": false}, {"text": "D", "isCorrect": false}] },
+    { "type": "QA",  "text": "Question text", "marks": 5, "modelAnswer": "Full model answer here" }
+  ]
+}`;
+
 function conversationToBaseMessages(messages: ConversationMessage[]): BaseMessage[] {
-  return messages.map((m) => {
-    if (m.role === "user") return new HumanMessage(m.content);
-    return new AIMessage(m.content);
-  });
+  return messages.map((m) =>
+    m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
+  );
+}
+
+function parseJsonResponse(raw: string): z.infer<typeof generatedQuestionsSchema> {
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON object found in AI response");
+  return generatedQuestionsSchema.parse(JSON.parse(match[0]));
+}
+
+// ─── Text extraction for non-PDF formats ────────────────────────────────────
+
+async function extractTextFromDocx(base64: string): Promise<string> {
+  const mammoth = await import("mammoth");
+  const buffer = Buffer.from(base64, "base64");
+  const result = await mammoth.extractRawText({ buffer });
+  return result.value;
+}
+
+async function extractTextFromPptx(base64: string): Promise<string> {
+  const JSZip = (await import("jszip")).default;
+  const zip = await JSZip.loadAsync(Buffer.from(base64, "base64"));
+  const slideFiles = Object.keys(zip.files)
+    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+    .sort();
+  const textParts: string[] = [];
+  for (const name of slideFiles) {
+    const xml = await zip.files[name].async("string");
+    const matches = xml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) ?? [];
+    const text = matches.map((m) => m.replace(/<[^>]+>/g, "")).join(" ");
+    if (text.trim()) textParts.push(text);
+  }
+  return textParts.join("\n");
 }
 
 // ─── generateQuestionsFromTopic ───────────────────────────────────────────────
@@ -122,33 +157,24 @@ export async function generateQuestionsFromTopic(
     const systemPrompt = buildSystemPromptForTopic(topic, quizType, count, difficulty);
     const userPrompt = `Generate ${count} ${quizType} questions about "${topic}" at ${difficulty} difficulty.`;
 
-    // Build the messages array for the chain
     const chainMessages: BaseMessage[] = [
       new SystemMessage(systemPrompt),
       ...conversationToBaseMessages(messages),
       new HumanMessage(userPrompt),
     ];
 
-    const structuredLlm = geminiFlash.withStructuredOutput(generatedQuestionsSchema);
+    const structuredLlm = claude.withStructuredOutput(generatedQuestionsSchema);
     const result = await structuredLlm.invoke(chainMessages);
 
-    if (!result || !result.questions) {
-      throw new Error("No questions returned from AI");
-    }
+    if (!result?.questions) throw new Error("No questions returned from AI");
 
     const updatedMessages: ConversationMessage[] = [
       ...messages,
       { role: "user", content: userPrompt },
-      {
-        role: "assistant",
-        content: JSON.stringify({ questions: result.questions }),
-      },
+      { role: "assistant", content: JSON.stringify({ questions: result.questions }) },
     ];
 
-    return {
-      questions: result.questions,
-      updatedMessages,
-    };
+    return { questions: result.questions, updatedMessages };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`AI generation failed: ${message}`);
@@ -157,13 +183,6 @@ export async function generateQuestionsFromTopic(
 
 // ─── generateQuestionsFromDocument ────────────────────────────────────────────
 
-const JSON_SCHEMA_HINT = `{
-  "questions": [
-    { "type": "MCQ", "text": "Question text", "marks": 2, "options": [{"text": "A", "isCorrect": true}, {"text": "B", "isCorrect": false}, {"text": "C", "isCorrect": false}, {"text": "D", "isCorrect": false}] },
-    { "type": "QA",  "text": "Question text", "marks": 5, "modelAnswer": "Full model answer here" }
-  ]
-}`;
-
 export async function generateQuestionsFromDocument(
   params: GenerateFromDocParams
 ): Promise<GenerateResult> {
@@ -171,21 +190,48 @@ export async function generateQuestionsFromDocument(
 
   try {
     const systemPrompt = buildSystemPromptForDocument(quizType, count, difficulty);
-    const userPrompt =
-      `Analyze the document "${fileName}" and generate exactly ${count} ${quizType} questions at ${difficulty} difficulty.\n\n` +
-      `Respond with ONLY valid JSON — no markdown, no code fences, no extra text — matching this schema:\n${JSON_SCHEMA_HINT}`;
+    const jsonInstruction =
+      `\n\nRespond with ONLY valid JSON — no markdown, no code fences — matching this schema:\n${JSON_SCHEMA_HINT}`;
 
-    // Use image_url format with data URI — correct for @langchain/google-genai v2
-    // withStructuredOutput (function calling) conflicts with multimodal inputs,
-    // so we invoke directly and parse the JSON from the text response.
-    const humanMessage = new HumanMessage({
-      content: [
-        { type: "text", text: systemPrompt + "\n\n" + userPrompt },
-        { type: "image_url", image_url: `data:${mimeType};base64,${fileBase64}` },
-      ],
-    });
+    let humanMessage: HumanMessage;
 
-    const response = await geminiFlash.invoke([humanMessage]);
+    if (mimeType === "application/pdf") {
+      // Claude natively supports PDF as a document block
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      humanMessage = new HumanMessage({
+        content: [
+          {
+            type: "text",
+            text: systemPrompt + `\n\nAnalyze "${fileName}" and generate exactly ${count} ${quizType} questions at ${difficulty} difficulty.` + jsonInstruction,
+          },
+          {
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: fileBase64 },
+          },
+        ] as any,
+      });
+    } else {
+      // Extract text for DOCX, PPTX, TXT — then send as plain text prompt
+      let documentText = "";
+      if (mimeType === "text/plain") {
+        documentText = Buffer.from(fileBase64, "base64").toString("utf-8");
+      } else if (mimeType.includes("wordprocessingml")) {
+        documentText = await extractTextFromDocx(fileBase64);
+      } else if (mimeType.includes("presentationml")) {
+        documentText = await extractTextFromPptx(fileBase64);
+      }
+
+      if (!documentText.trim()) throw new Error("Could not extract text from document");
+
+      const truncated = documentText.slice(0, 60_000); // stay within context
+      humanMessage = new HumanMessage(
+        `${systemPrompt}\n\nDocument: "${fileName}"\n\n---\n${truncated}\n---\n\n` +
+        `Generate exactly ${count} ${quizType} questions at ${difficulty} difficulty from the above document.` +
+        jsonInstruction
+      );
+    }
+
+    const response = await claude.invoke([humanMessage]);
 
     const raw =
       typeof response.content === "string"
@@ -194,16 +240,10 @@ export async function generateQuestionsFromDocument(
         ? (response.content[0] as { text?: string }).text ?? ""
         : "";
 
-    // Strip markdown code fences if model wraps response anyway
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON object found in AI response");
-
-    const parsed = generatedQuestionsSchema.parse(JSON.parse(jsonMatch[0]));
+    const parsed = parseJsonResponse(raw);
 
     const updatedMessages: ConversationMessage[] = [
-      { role: "user", content: userPrompt },
+      { role: "user", content: `Generate questions from "${fileName}"` },
       { role: "assistant", content: JSON.stringify({ questions: parsed.questions }) },
     ];
 
