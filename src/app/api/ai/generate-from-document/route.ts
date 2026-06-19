@@ -1,11 +1,12 @@
+export const maxDuration = 60;
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { quizzes, classrooms, aiDocuments } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { uploadToS3 } from "@/lib/s3";
+import { getObjectBuffer, getS3Url } from "@/lib/s3";
 import { generateQuestionsFromDocument } from "@/lib/ai/quiz-generator";
-import { randomUUID } from "crypto";
 
 const ALLOWED_MIME_TYPES: Record<string, "PDF" | "DOCX" | "TXT" | "PPT"> = {
   "application/pdf": "PDF",
@@ -13,15 +14,6 @@ const ALLOWED_MIME_TYPES: Record<string, "PDF" | "DOCX" | "TXT" | "PPT"> = {
   "text/plain": "TXT",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "PPT",
 };
-
-const MIME_TO_EXT: Record<string, string> = {
-  "application/pdf": "pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-  "text/plain": "txt",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
-};
-
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -32,24 +24,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  let formData: FormData;
+  let body: {
+    s3Key?: string;
+    quizId?: string;
+    quizType?: string;
+    count?: number;
+    difficulty?: string;
+    fileName?: string;
+    mimeType?: string;
+  };
   try {
-    formData = await req.formData();
+    body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const file       = formData.get("file") as File | null;
-  const quizId     = formData.get("quizId") as string | null;
-  const quizType   = formData.get("quizType") as string | null;
-  const countStr   = formData.get("count") as string | null;
-  const difficulty = formData.get("difficulty") as string | null;
+  const { s3Key, quizId, quizType, count, difficulty, fileName, mimeType } = body;
 
-  if (!file || !quizId || !quizType || !countStr || !difficulty) {
+  if (!s3Key || !quizId || !quizType || !count || !difficulty || !fileName || !mimeType) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const fileType = ALLOWED_MIME_TYPES[file.type];
+  const fileType = ALLOWED_MIME_TYPES[mimeType];
   if (!fileType) {
     return NextResponse.json(
       { error: "Invalid file type. Allowed: PDF, DOCX, TXT, PPT" },
@@ -57,15 +53,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (file.size > MAX_FILE_SIZE) {
-    return NextResponse.json(
-      { error: "File too large. Maximum size is 20 MB" },
-      { status: 400 }
-    );
-  }
-
-  const count = parseInt(countStr, 10);
-  if (isNaN(count) || count < 1 || count > 20) {
+  if (!Number.isInteger(count) || count < 1 || count > 20) {
     return NextResponse.json({ error: "Count must be between 1 and 20" }, { status: 400 });
   }
   if (!["MCQ", "QA", "MIXED"].includes(quizType)) {
@@ -87,27 +75,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
   }
 
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer      = Buffer.from(arrayBuffer);
-  const base64      = buffer.toString("base64");
-
-  // Upload to S3
-  const ext   = MIME_TO_EXT[file.type] ?? "bin";
-  const s3Key = `ai-documents/${session.user.id}/${randomUUID()}.${ext}`;
-  let fileUrl: string;
+  // Download file from S3 (client already uploaded via presigned URL)
+  let buffer: Buffer;
   try {
-    fileUrl = await uploadToS3(buffer, s3Key, file.type);
+    buffer = await getObjectBuffer(s3Key);
   } catch (err) {
-    console.error("[s3 document upload]", err);
-    return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
+    console.error("[s3 document download]", err);
+    return NextResponse.json({ error: "Failed to retrieve uploaded file" }, { status: 500 });
   }
+
+  const base64 = buffer.toString("base64");
+  const fileUrl = getS3Url(s3Key);
 
   // Save to aiDocuments table
   const [savedDoc] = await db
     .insert(aiDocuments)
     .values({
       teacherId: session.user.id!,
-      fileName:  file.name,
+      fileName,
       fileType,
       fileUrl,
       s3Key,
@@ -117,9 +102,9 @@ export async function POST(req: Request) {
   try {
     const { questions } = await generateQuestionsFromDocument({
       fileBase64: base64,
-      mimeType:   file.type,
-      fileName:   file.name,
-      quizType:   quizType as "MCQ" | "QA" | "MIXED",
+      mimeType,
+      fileName,
+      quizType: quizType as "MCQ" | "QA" | "MIXED",
       count,
       difficulty: difficulty as "EASY" | "MEDIUM" | "HARD",
     });

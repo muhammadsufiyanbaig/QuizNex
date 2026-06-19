@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const s3 = new S3Client({
   region: process.env.S3_REGION!,
@@ -35,4 +36,22 @@ export async function uploadToS3(
 
 export async function deleteFromS3(key: string): Promise<void> {
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+}
+
+export async function getPresignedPutUrl(
+  key: string,
+  mimeType: string,
+  expiresInSecs = 300
+): Promise<string> {
+  const command = new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: mimeType });
+  return getSignedUrl(s3, command, { expiresIn: expiresInSecs });
+}
+
+export async function getObjectBuffer(key: string): Promise<Buffer> {
+  const resp = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of resp.Body as AsyncIterable<Uint8Array>) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }

@@ -132,16 +132,42 @@ export default function AiGenerateClient({ quiz, classroomId }: Props) {
     setGenerating(true);
     setError("");
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("quizId", quiz.id);
-      fd.append("quizType", quizType);
-      fd.append("count", String(count));
-      fd.append("difficulty", difficulty);
+      // Step 1: Get presigned S3 upload URL
+      const presignRes = await fetch("/api/ai/generate-from-document/presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mimeType: file.type, fileSize: file.size, fileName: file.name }),
+      });
+      const presignData = await presignRes.json();
+      if (!presignRes.ok) {
+        setError(presignData.error ?? "Failed to prepare upload");
+        return;
+      }
 
+      // Step 2: Upload directly to S3 (browser → S3, no Lambda memory cost)
+      const uploadRes = await fetch(presignData.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!uploadRes.ok) {
+        setError("Failed to upload file to storage");
+        return;
+      }
+
+      // Step 3: Trigger AI generation with the S3 key
       const res = await fetch("/api/ai/generate-from-document", {
         method: "POST",
-        body: fd,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          s3Key: presignData.s3Key,
+          quizId: quiz.id,
+          quizType,
+          count,
+          difficulty,
+          fileName: file.name,
+          mimeType: file.type,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {

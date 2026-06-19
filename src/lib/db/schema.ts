@@ -10,6 +10,7 @@ import {
   pgEnum,
   json,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -139,7 +140,9 @@ export const classrooms = pgTable("classrooms", {
   isArchived: boolean("is_archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_classrooms_teacher_id").on(t.teacherId),
+]);
 
 // ── ClassroomStudent (enrollment) ────────────
 export const classroomStudents = pgTable(
@@ -178,7 +181,10 @@ export const quizzes = pgTable("quizzes", {
   displayOrder: integer("display_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_quizzes_classroom_id").on(t.classroomId),
+  index("idx_quizzes_classroom_status").on(t.classroomId, t.status),
+]);
 
 // ── Question ──────────────────────────────────
 export const questions = pgTable("questions", {
@@ -193,7 +199,9 @@ export const questions = pgTable("questions", {
   order: integer("order").notNull(),
   modelAnswer: text("model_answer"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_questions_quiz_id").on(t.quizId),
+]);
 
 // ── Option (MCQ choices) ──────────────────────
 export const options = pgTable("options", {
@@ -221,7 +229,11 @@ export const quizAttempts = pgTable("quiz_attempts", {
   totalScore: real("total_score"),
   isFlagged: boolean("is_flagged").default(false).notNull(),
   flagReason: text("flag_reason"),
-});
+}, (t) => [
+  index("idx_quiz_attempts_quiz_id").on(t.quizId),
+  index("idx_quiz_attempts_student_id").on(t.studentId),
+  index("idx_quiz_attempts_quiz_student").on(t.quizId, t.studentId),
+]);
 
 // ── Answer ────────────────────────────────────
 export const answers = pgTable("answers", {
@@ -236,7 +248,10 @@ export const answers = pgTable("answers", {
   textAnswer: text("text_answer"),
   timeTakenSecs: integer("time_taken_secs").default(0).notNull(),
   marksAwarded: real("marks_awarded"),
-});
+}, (t) => [
+  index("idx_answers_attempt_id").on(t.attemptId),
+  index("idx_answers_question_id").on(t.questionId),
+]);
 
 // ── ProctoringEvent ───────────────────────────
 export const proctoringEvents = pgTable("proctoring_events", {
@@ -247,7 +262,9 @@ export const proctoringEvents = pgTable("proctoring_events", {
   type: proctoringEventTypeEnum("type").notNull(),
   occurredAt: timestamp("occurred_at").defaultNow().notNull(),
   metadata: json("metadata"),
-});
+}, (t) => [
+  index("idx_proctoring_events_attempt_id").on(t.attemptId),
+]);
 
 // ── AIDocument ────────────────────────────────
 export const aiDocuments = pgTable("ai_documents", {
@@ -448,7 +465,9 @@ export const passkeys = pgTable("passkeys", {
   name:         varchar("name", { length: 100 }).notNull().default("Passkey"),
   createdAt:    timestamp("created_at").defaultNow().notNull(),
   lastUsedAt:   timestamp("last_used_at"),
-});
+}, (t) => [
+  index("idx_passkeys_user_id").on(t.userId),
+]);
 
 // ── WebAuthn Challenge (temp storage, 5-min expiry) ──
 export const webauthnChallenges = pgTable("webauthn_challenges", {
@@ -483,7 +502,10 @@ export const notifications = pgTable("notifications", {
   link:      varchar("link", { length: 500 }),
   isRead:    boolean("is_read").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_notifications_user_id").on(t.userId),
+  index("idx_notifications_user_read").on(t.userId, t.isRead),
+]);
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),

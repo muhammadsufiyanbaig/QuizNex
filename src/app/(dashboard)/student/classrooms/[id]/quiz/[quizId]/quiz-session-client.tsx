@@ -4,8 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useQuizSessionStore } from "@/store/quiz-session.store";
-import * as tf from "@tensorflow/tfjs";
-import * as faceLandmarksDetection from "@tensorflow-models/face-landmarks-detection";
+import type { FaceLandmarksDetector } from "@tensorflow-models/face-landmarks-detection";
 import {
   AlertTriangle,
   Camera,
@@ -117,7 +116,7 @@ export default function QuizSessionClient({
   const qaDebounceRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const questionStartRef    = useRef(Date.now());
   const gazeWarnTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const faceModelRef        = useRef<faceLandmarksDetection.FaceLandmarksDetector | null>(null);
+  const faceModelRef        = useRef<FaceLandmarksDetector | null>(null);
 
   // ── Computed ─────────────────────────────────────────────────────────────────
   const timeLimitSecs      = quiz.timeLimitMins * 60;
@@ -355,12 +354,16 @@ export default function QuizSessionClient({
     if (!cameraGranted) return;
     let cancelled = false;
     (async () => {
+      const [tf, fld] = await Promise.all([
+        import("@tensorflow/tfjs"),
+        import("@tensorflow-models/face-landmarks-detection"),
+      ]);
       await tf.ready();
-      const model = await faceLandmarksDetection.createDetector(
-        faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+      const model = await fld.createDetector(
+        fld.SupportedModels.MediaPipeFaceMesh,
         {
           runtime: "tfjs",
-          refineLandmarks: true, // enables iris indices 468 (left) and 473 (right)
+          refineLandmarks: true,
           maxFaces: 1,
         }
       );

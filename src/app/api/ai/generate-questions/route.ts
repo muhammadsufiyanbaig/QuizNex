@@ -1,3 +1,5 @@
+export const maxDuration = 60;
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { quizzes, classrooms } from "@/lib/db/schema";
