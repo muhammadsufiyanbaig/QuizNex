@@ -157,6 +157,13 @@ export async function generateQuestionsFromTopic(
 
 // ─── generateQuestionsFromDocument ────────────────────────────────────────────
 
+const JSON_SCHEMA_HINT = `{
+  "questions": [
+    { "type": "MCQ", "text": "Question text", "marks": 2, "options": [{"text": "A", "isCorrect": true}, {"text": "B", "isCorrect": false}, {"text": "C", "isCorrect": false}, {"text": "D", "isCorrect": false}] },
+    { "type": "QA",  "text": "Question text", "marks": 5, "modelAnswer": "Full model answer here" }
+  ]
+}`;
+
 export async function generateQuestionsFromDocument(
   params: GenerateFromDocParams
 ): Promise<GenerateResult> {
@@ -164,34 +171,43 @@ export async function generateQuestionsFromDocument(
 
   try {
     const systemPrompt = buildSystemPromptForDocument(quizType, count, difficulty);
-    const userPrompt = `Analyze the document "${fileName}" and generate ${count} ${quizType} questions at ${difficulty} difficulty level.`;
+    const userPrompt =
+      `Analyze the document "${fileName}" and generate exactly ${count} ${quizType} questions at ${difficulty} difficulty.\n\n` +
+      `Respond with ONLY valid JSON — no markdown, no code fences, no extra text — matching this schema:\n${JSON_SCHEMA_HINT}`;
 
+    // Use image_url format with data URI — correct for @langchain/google-genai v2
+    // withStructuredOutput (function calling) conflicts with multimodal inputs,
+    // so we invoke directly and parse the JSON from the text response.
     const humanMessage = new HumanMessage({
       content: [
         { type: "text", text: systemPrompt + "\n\n" + userPrompt },
-        { type: "media", data: fileBase64, mimeType },
+        { type: "image_url", image_url: `data:${mimeType};base64,${fileBase64}` },
       ],
     });
 
-    const structuredLlm = geminiFlash.withStructuredOutput(generatedQuestionsSchema);
-    const result = await structuredLlm.invoke([humanMessage]);
+    const response = await geminiFlash.invoke([humanMessage]);
 
-    if (!result || !result.questions) {
-      throw new Error("No questions returned from AI");
-    }
+    const raw =
+      typeof response.content === "string"
+        ? response.content
+        : Array.isArray(response.content) && response.content[0]
+        ? (response.content[0] as { text?: string }).text ?? ""
+        : "";
+
+    // Strip markdown code fences if model wraps response anyway
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON object found in AI response");
+
+    const parsed = generatedQuestionsSchema.parse(JSON.parse(jsonMatch[0]));
 
     const updatedMessages: ConversationMessage[] = [
       { role: "user", content: userPrompt },
-      {
-        role: "assistant",
-        content: JSON.stringify({ questions: result.questions }),
-      },
+      { role: "assistant", content: JSON.stringify({ questions: parsed.questions }) },
     ];
 
-    return {
-      questions: result.questions,
-      updatedMessages,
-    };
+    return { questions: parsed.questions, updatedMessages };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`AI generation failed: ${message}`);

@@ -125,7 +125,8 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ questions, documentId: savedDoc.id });
-  } catch {
+  } catch (err) {
+    console.error("[ai generate-from-document]", err);
     return NextResponse.json(
       {
         error:   "AI generation is temporarily unavailable. Please try again later.",
