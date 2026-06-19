@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   Sparkles,
@@ -15,6 +15,7 @@ import {
   RefreshCw,
   ArrowLeft,
   Wand2,
+  AlertCircle,
 } from "lucide-react";
 import type { GeneratedQuestion } from "@/lib/ai/quiz-generator";
 
@@ -73,6 +74,13 @@ export default function AiGenerateClient({ quiz, classroomId }: Props) {
   const [showHistory, setShowHistory] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-dismiss error popup after 8 seconds
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(""), 8000);
+    return () => clearTimeout(t);
+  }, [error]);
 
   // ── Generate from topic ───────────────────────────────────────────────────
 
@@ -334,14 +342,38 @@ export default function AiGenerateClient({ quiz, classroomId }: Props) {
         </div>
       </div>
 
-      {/* Error banner */}
+      {/* Error popup modal */}
       {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-          <X className="h-4 w-4 shrink-0" />
-          <span className="flex-1">{error}</span>
-          <button onClick={() => setError("")} className="text-red-400/60 hover:text-red-400">
-            <X className="h-3.5 w-3.5" />
-          </button>
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setError("")}
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-red-500/30 bg-[#1a0f0f] shadow-2xl shadow-red-900/30 p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/15">
+                <AlertCircle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-red-300 mb-1">Claude API Error</p>
+                <p className="text-sm text-red-400/80 wrap-break-word">{error}</p>
+              </div>
+              <button
+                onClick={() => setError("")}
+                className="shrink-0 text-red-500/50 hover:text-red-400 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setError("")}
+                className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -77,13 +77,10 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ questions, messages: finalMessages });
-  } catch {
-    return NextResponse.json(
-      {
-        error: "AI generation is temporarily unavailable. Please try again later.",
-        partial: [],
-      },
-      { status: 503 }
-    );
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
+    const detail = raw.replace(/^AI generation failed:\s*/i, "").slice(0, 300);
+    console.error("[ai refine]", raw);
+    return NextResponse.json({ error: detail || "AI refinement failed. Please try again." }, { status: 503 });
   }
 }

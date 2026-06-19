@@ -126,13 +126,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ questions, documentId: savedDoc.id });
   } catch (err) {
-    console.error("[ai generate-from-document]", err);
-    return NextResponse.json(
-      {
-        error:   "AI generation is temporarily unavailable. Please try again later.",
-        partial: [],
-      },
-      { status: 503 }
-    );
+    const raw = err instanceof Error ? err.message : String(err);
+    const detail = raw.replace(/^AI generation failed:\s*/i, "").slice(0, 300);
+    console.error("[ai generate-from-document]", raw);
+    return NextResponse.json({ error: detail || "AI generation failed. Please try again." }, { status: 503 });
   }
 }
