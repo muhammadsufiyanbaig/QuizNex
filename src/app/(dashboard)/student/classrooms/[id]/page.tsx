@@ -5,6 +5,8 @@ import { eq, and, inArray, count, desc } from "drizzle-orm";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, BookOpen, FileQuestion, User, PlayCircle, Eye, Clock, CheckCircle2, Trophy } from "lucide-react";
+import { autoActivateIfScheduled } from "@/lib/quiz-utils";
+import ClassroomQuizWatcher from "@/components/quiz/classroom-quiz-watcher";
 
 export default async function StudentClassroomDetailPage({
   params,
@@ -46,15 +48,20 @@ export default async function StudentClassroomDetailPage({
     .where(eq(users.id, classroom.teacherId))
     .limit(1);
 
-  const classroomQuizzes = await db
+  const rawQuizzes = await db
     .select()
     .from(quizzes)
     .where(eq(quizzes.classroomId, id))
     .orderBy(quizzes.createdAt);
 
+  // Phase 2: lazy-activate any scheduled quizzes whose time has passed
+  const classroomQuizzes = await Promise.all(rawQuizzes.map(autoActivateIfScheduled));
+
   const visibleQuizzes = classroomQuizzes.filter(
     (q) => q.status === "PUBLISHED" || q.status === "ACTIVE" || q.status === "COMPLETED"
   );
+
+  const hasPublishedQuizzes = visibleQuizzes.some((q) => q.status === "PUBLISHED");
 
   // For each visible quiz, check if student has a submitted attempt
   const visibleIds = visibleQuizzes.map((q) => q.id);
@@ -108,6 +115,9 @@ export default async function StudentClassroomDetailPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      {/* Phase 3: SSE watcher — refreshes page when quiz goes ACTIVE */}
+      <ClassroomQuizWatcher classroomId={id} hasPublishedQuizzes={hasPublishedQuizzes} />
+
       {/* Back */}
       <div className="flex items-center gap-3">
         <Link

@@ -11,6 +11,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import AnalyticsExportButtons from "@/components/analytics/analytics-export-buttons";
 
 export default async function ClassroomAnalyticsPage({
   params,
@@ -165,11 +166,42 @@ export default async function ClassroomAnalyticsPage({
           Back to Classroom
         </Link>
       </div>
-      <div>
-        <h1 className="text-3xl font-bold gradient-text">{classroom.name} — Analytics</h1>
-        {classroom.subject && (
-          <p className="text-slate-400 mt-1">{classroom.subject}</p>
-        )}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold gradient-text">{classroom.name} — Analytics</h1>
+          {classroom.subject && (
+            <p className="text-slate-400 mt-1">{classroom.subject}</p>
+          )}
+        </div>
+        <AnalyticsExportButtons
+          csvHref={`/api/classrooms/${id}/analytics/export`}
+          pdfFilename={`${classroom.name.replace(/[^a-z0-9]/gi, "-")}-analytics.pdf`}
+          title={`${classroom.name} — Analytics`}
+          summary={{
+            totalStudents,
+            totalQuizzes,
+            overallAvgScore,
+            completionRate,
+          }}
+          quizStats={quizStats.map((q) => ({
+            title:        q.title,
+            type:         q.type,
+            totalMarks:   q.totalMarks,
+            attempted:    q.attempted,
+            avgScore:     q.avgScore,
+            avgScorePct:  q.avgScorePct,
+            flaggedCount: q.flaggedCount,
+            difficulty:   q.difficulty,
+          }))}
+          studentRankings={studentRankings.map((s) => ({
+            name:              s.name,
+            email:             s.email,
+            quizzesAttempted:  s.quizzesAttempted,
+            avgScore:          s.avgScore,
+            totalScore:        s.totalScore,
+            flaggedCount:      s.flaggedCount,
+          }))}
+        />
       </div>
 
       {/* Stats row */}

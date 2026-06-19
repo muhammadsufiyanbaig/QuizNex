@@ -3,9 +3,9 @@ import { db } from "@/lib/db";
 import { quizzes, classrooms, aiDocuments } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { cloudinary } from "@/lib/cloudinary";
+import { uploadToS3 } from "@/lib/s3";
 import { generateQuestionsFromDocument } from "@/lib/ai/quiz-generator";
-import { Readable } from "stream";
+import { randomUUID } from "crypto";
 
 const ALLOWED_MIME_TYPES: Record<string, "PDF" | "DOCX" | "TXT" | "PPT"> = {
   "application/pdf": "PDF",
@@ -14,27 +14,14 @@ const ALLOWED_MIME_TYPES: Record<string, "PDF" | "DOCX" | "TXT" | "PPT"> = {
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "PPT",
 };
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const MIME_TO_EXT: Record<string, string> = {
+  "application/pdf": "pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "text/plain": "txt",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+};
 
-function uploadToCloudinary(
-  buffer: Buffer,
-  options: { resource_type: "raw"; folder: string; public_id?: string }
-): Promise<{ secure_url: string; public_id: string }> {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      options,
-      (error, result) => {
-        if (error || !result) {
-          reject(error ?? new Error("Cloudinary upload failed"));
-        } else {
-          resolve({ secure_url: result.secure_url, public_id: result.public_id });
-        }
-      }
-    );
-    const readable = Readable.from(buffer);
-    readable.pipe(uploadStream);
-  });
-}
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -52,17 +39,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   }
 
-  const file = formData.get("file") as File | null;
-  const quizId = formData.get("quizId") as string | null;
-  const quizType = formData.get("quizType") as string | null;
-  const countStr = formData.get("count") as string | null;
+  const file       = formData.get("file") as File | null;
+  const quizId     = formData.get("quizId") as string | null;
+  const quizType   = formData.get("quizType") as string | null;
+  const countStr   = formData.get("count") as string | null;
   const difficulty = formData.get("difficulty") as string | null;
 
   if (!file || !quizId || !quizType || !countStr || !difficulty) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  // Validate file type
   const fileType = ALLOWED_MIME_TYPES[file.type];
   if (!fileType) {
     return NextResponse.json(
@@ -71,15 +57,13 @@ export async function POST(req: Request) {
     );
   }
 
-  // Validate file size
   if (file.size > MAX_FILE_SIZE) {
     return NextResponse.json(
-      { error: "File too large. Maximum size is 20MB" },
+      { error: "File too large. Maximum size is 20 MB" },
       { status: 400 }
     );
   }
 
-  // Validate other fields
   const count = parseInt(countStr, 10);
   if (isNaN(count) || count < 1 || count > 20) {
     return NextResponse.json({ error: "Count must be between 1 and 20" }, { status: 400 });
@@ -103,24 +87,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
   }
 
-  // Convert file to buffer and base64
   const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  const base64 = buffer.toString("base64");
+  const buffer      = Buffer.from(arrayBuffer);
+  const base64      = buffer.toString("base64");
 
-  // Upload to Cloudinary
-  let cloudinaryUrl: string;
-  let publicId: string;
+  // Upload to S3
+  const ext   = MIME_TO_EXT[file.type] ?? "bin";
+  const s3Key = `ai-documents/${session.user.id}/${randomUUID()}.${ext}`;
+  let fileUrl: string;
   try {
-    const uploadResult = await uploadToCloudinary(buffer, {
-      resource_type: "raw",
-      folder: "quiznex/ai-documents",
-    });
-    cloudinaryUrl = uploadResult.secure_url;
-    publicId = uploadResult.public_id;
-    // publicId is stored but not used further in this request
-    void publicId;
-  } catch {
+    fileUrl = await uploadToS3(buffer, s3Key, file.type);
+  } catch (err) {
+    console.error("[s3 document upload]", err);
     return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
   }
 
@@ -129,21 +107,19 @@ export async function POST(req: Request) {
     .insert(aiDocuments)
     .values({
       teacherId: session.user.id!,
-      fileName: file.name,
+      fileName:  file.name,
       fileType,
-      cloudinaryUrl,
+      fileUrl,
+      s3Key,
     })
     .returning();
-
-  // Map MIME type for AI
-  const mimeType = file.type;
 
   try {
     const { questions } = await generateQuestionsFromDocument({
       fileBase64: base64,
-      mimeType,
-      fileName: file.name,
-      quizType: quizType as "MCQ" | "QA" | "MIXED",
+      mimeType:   file.type,
+      fileName:   file.name,
+      quizType:   quizType as "MCQ" | "QA" | "MIXED",
       count,
       difficulty: difficulty as "EASY" | "MEDIUM" | "HARD",
     });
@@ -152,7 +128,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json(
       {
-        error: "AI generation is temporarily unavailable. Please try again later.",
+        error:   "AI generation is temporarily unavailable. Please try again later.",
         partial: [],
       },
       { status: 503 }

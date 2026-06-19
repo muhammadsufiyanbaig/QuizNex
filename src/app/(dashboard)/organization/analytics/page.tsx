@@ -12,6 +12,7 @@ import {
 import { eq, and, inArray, count, avg, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { Building2, BarChart2 } from "lucide-react";
+import AnalyticsExportButtons from "@/components/analytics/analytics-export-buttons";
 
 export default async function OrgAnalyticsPage() {
   const session = await auth();
@@ -313,13 +314,35 @@ export default async function OrgAnalyticsPage() {
             <p className="text-sm text-slate-400">Aggregate data across all teachers and classrooms.</p>
           </div>
         </div>
-        <a
-          href="/api/organization/analytics/export"
-          download="org-analytics.csv"
-          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-        >
-          Export CSV
-        </a>
+        <AnalyticsExportButtons
+          csvHref="/api/organization/analytics/export"
+          pdfFilename="org-analytics.pdf"
+          title="Organization Analytics"
+          summary={{
+            totalStudents:    uniqueStudentCount,
+            totalQuizzes:     quizCount,
+            overallAvgScore:  overallAvgScore,
+            completionRate:   totalAttempts > 0 ? (totalAttempts / Math.max(uniqueStudentCount * quizCount, 1)) * 100 : 0,
+          }}
+          quizStats={topQuizzes.map((q) => ({
+            title:        q.title,
+            type:         "",
+            totalMarks:   0,
+            attempted:    q.attemptCount,
+            avgScore:     q.avgScore,
+            avgScorePct:  null,
+            flaggedCount: 0,
+            difficulty:   null,
+          }))}
+          studentRankings={studentLeaderboard.slice(0, 20).map((s) => ({
+            name:             s.name,
+            email:            s.email,
+            quizzesAttempted: s.quizzesAttempted,
+            avgScore:         s.avgScorePct,
+            totalScore:       s.totalScore,
+            flaggedCount:     0,
+          }))}
+        />
       </div>
 
       {/* 5 stat cards */}

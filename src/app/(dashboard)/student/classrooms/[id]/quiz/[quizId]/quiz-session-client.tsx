@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useQuizSessionStore } from "@/store/quiz-session.store";
 import * as tf from "@tensorflow/tfjs";
-import * as blazeface from "@tensorflow-models/blazeface";
+import * as faceLandmarksDetection from "@tensorflow-models/face-landmarks-detection";
 import {
   AlertTriangle,
   Camera,
@@ -108,13 +108,16 @@ export default function QuizSessionClient({
   const streamRef           = useRef<MediaStream | null>(null);
   const attemptIdRef        = useRef(existingAttempt?.id ?? "");
   const elapsedRef          = useRef(existingAttempt?.timerElapsedSecs ?? 0);
+
+  // ── Phase 4: localStorage key helper ────────────────────────────────────────
+  const lsKey = () => attemptIdRef.current ? `quiznex_answers_${attemptIdRef.current}` : null;
   const pausedRef           = useRef(false);
   const isSubmittingRef     = useRef(false);
   const gazeTimestamps      = useRef<number[]>([]);
   const qaDebounceRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const questionStartRef    = useRef(Date.now());
   const gazeWarnTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const blazeModelRef       = useRef<blazeface.BlazeFaceModel | null>(null);
+  const faceModelRef        = useRef<faceLandmarksDetection.FaceLandmarksDetector | null>(null);
 
   // ── Computed ─────────────────────────────────────────────────────────────────
   const timeLimitSecs      = quiz.timeLimitMins * 60;
@@ -123,6 +126,33 @@ export default function QuizSessionClient({
   const currentQ           = questions[currentQuestionIndex];
   const currentAnswer      = currentQ ? answers[currentQ.id] : undefined;
   const unansweredCount    = questions.filter((q) => !answers[q.id]?.selectedOptionId && !answers[q.id]?.textAnswer).length;
+
+  // ── Phase 4: save answers to localStorage on every change ───────────────────
+  useEffect(() => {
+    const key = lsKey();
+    if (!key || phase !== "quiz") return;
+    try {
+      localStorage.setItem(key, JSON.stringify(answers));
+    } catch { /* storage full — ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, phase]);
+
+  // ── Phase 4: on mount, merge cached answers (server wins on conflict) ────────
+  useEffect(() => {
+    if (!existingAttempt?.id) return;
+    try {
+      const cached = localStorage.getItem(`quiznex_answers_${existingAttempt.id}`);
+      if (!cached) return;
+      const parsed = JSON.parse(cached) as typeof answers;
+      // Merge: cached first, then override with server answers
+      for (const [qId, ans] of Object.entries(parsed)) {
+        if (!existingAttempt.answers[qId]) {
+          setAnswer(qId, ans);
+        }
+      }
+    } catch { /* corrupt cache — ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Camera ──────────────────────────────────────────────────────────────────
   const stopCamera = useCallback(() => {
@@ -320,30 +350,76 @@ export default function QuizSessionClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // ── Load BlazeFace model once when camera is granted ─────────────────────────
+  // ── Load MediaPipe FaceMesh model once when camera is granted ────────────────
   useEffect(() => {
     if (!cameraGranted) return;
     let cancelled = false;
     (async () => {
       await tf.ready();
-      const model = await blazeface.load();
-      if (!cancelled) blazeModelRef.current = model;
+      const model = await faceLandmarksDetection.createDetector(
+        faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+        {
+          runtime: "mediapipe",
+          solutionPath: "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4",
+          refineLandmarks: true, // enables iris indices 468 (left) and 473 (right)
+          maxFaces: 1,
+        }
+      );
+      if (!cancelled) faceModelRef.current = model;
     })().catch(() => {});
     return () => { cancelled = true; };
   }, [cameraGranted]);
 
-  // ── Face detection via BlazeFace (runs every 2 s during quiz) ────────────────
+  // ── Iris gaze detection via MediaPipe FaceMesh (runs every 2 s during quiz) ──
   useEffect(() => {
     if (phase !== "quiz") return;
 
     const iv = setInterval(async () => {
-      const model = blazeModelRef.current;
+      const model = faceModelRef.current;
       const video = videoRef.current;
       if (!model || !video || video.videoWidth === 0 || isSubmittingRef.current || pausedRef.current) return;
 
       try {
-        const predictions = await model.estimateFaces(video, false /* returnTensors */);
-        if (predictions.length === 0) {
+        const faces = await model.estimateFaces(video);
+
+        if (faces.length === 0) {
+          showGazeWarning();
+          recordGazeAway();
+          return;
+        }
+
+        const kp = faces[0].keypoints;
+
+        // Iris landmark indices (only present when refineLandmarks: true)
+        // 468 = left iris center, 473 = right iris center
+        const leftIris  = kp[468];
+        const rightIris = kp[473];
+
+        if (!leftIris || !rightIris) {
+          // refineLandmarks unavailable — face detected, treat as looking at screen
+          dismissGazeWarning();
+          return;
+        }
+
+        // Left eye corners: 33 (outer/temporal), 133 (inner/nasal)
+        // Right eye corners: 362 (inner/nasal), 263 (outer/temporal)
+        const leftOuter  = kp[33];
+        const leftInner  = kp[133];
+        const rightInner = kp[362];
+        const rightOuter = kp[263];
+
+        function irisRatio(outerX: number, innerX: number, irisX: number): number {
+          const eyeW = Math.abs(innerX - outerX);
+          if (eyeW < 5) return 0.5; // too small — treat as centered
+          return (irisX - Math.min(outerX, innerX)) / eyeW;
+        }
+
+        const leftRatio  = irisRatio(leftOuter.x,  leftInner.x,  leftIris.x);
+        const rightRatio = irisRatio(rightInner.x, rightOuter.x, rightIris.x);
+        const avgRatio   = (leftRatio + rightRatio) / 2;
+
+        // 0.30–0.70 = iris centered in eye = looking at screen
+        if (avgRatio < 0.30 || avgRatio > 0.70) {
           showGazeWarning();
           recordGazeAway();
         } else {
@@ -355,6 +431,28 @@ export default function QuizSessionClient({
     return () => clearInterval(iv);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  // ── Phase 3: SSE — detect teacher stopping the quiz mid-session ─────────────
+  useEffect(() => {
+    if (phase !== "quiz" && phase !== "paused") return;
+
+    const es = new EventSource(`/api/quizzes/${quiz.id}/stream`);
+
+    es.onmessage = (e: MessageEvent) => {
+      try {
+        const { status } = JSON.parse(e.data as string) as { status: string };
+        if (status === "COMPLETED" && !isSubmittingRef.current) {
+          es.close();
+          doSubmit("AUTO_SUBMITTED");
+        }
+      } catch { /* ignore parse errors */ }
+    };
+
+    es.onerror = () => es.close();
+
+    return () => es.close();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, quiz.id]);
 
   // ── Cleanup on unmount ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -455,6 +553,8 @@ export default function QuizSessionClient({
     syncTimer();
     stopCamera();
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    // Phase 4: clear localStorage buffer on submit
+    try { const k = lsKey(); if (k) localStorage.removeItem(k); } catch { /* ignore */ }
 
     try {
       const res = await fetch(`/api/attempts/${attemptIdRef.current}/submit`, {

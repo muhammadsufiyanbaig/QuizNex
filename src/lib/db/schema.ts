@@ -257,7 +257,8 @@ export const aiDocuments = pgTable("ai_documents", {
     .references(() => users.id, { onDelete: "cascade" }),
   fileName: varchar("file_name", { length: 255 }).notNull(),
   fileType: aiDocumentFileTypeEnum("file_type").notNull(),
-  cloudinaryUrl: varchar("cloudinary_url", { length: 500 }).notNull(),
+  fileUrl: varchar("file_url", { length: 1000 }).notNull(),
+  s3Key: varchar("s3_key", { length: 500 }),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 });
 

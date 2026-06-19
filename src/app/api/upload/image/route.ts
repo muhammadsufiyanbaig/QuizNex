@@ -1,13 +1,20 @@
 import { auth } from "@/auth";
-import { cloudinary } from "@/lib/cloudinary";
+import { uploadToS3 } from "@/lib/s3";
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES  = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+const EXT_MAP: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png":  "png",
+  "image/gif":  "gif",
+  "image/webp": "webp",
+};
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user)               return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user)                return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.user.role !== "TEACHER") return NextResponse.json({ error: "Forbidden" },    { status: 403 });
 
   let formData: FormData;
@@ -32,26 +39,14 @@ export async function POST(req: Request) {
 
   const bytes  = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
+  const ext    = EXT_MAP[file.type] ?? "jpg";
+  const key    = `quiz-questions/${randomUUID()}.${ext}`;
 
   try {
-    const result = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder:        "quiz-questions",
-          resource_type: "image",
-          allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-        },
-        (error, result) => {
-          if (error || !result) reject(error ?? new Error("Upload failed"));
-          else resolve(result as { secure_url: string; public_id: string });
-        }
-      );
-      stream.end(buffer);
-    });
-
-    return NextResponse.json({ url: result.secure_url, publicId: result.public_id });
+    const url = await uploadToS3(buffer, key, file.type);
+    return NextResponse.json({ url, key });
   } catch (err) {
-    console.error("[cloudinary upload]", err);
+    console.error("[s3 image upload]", err);
     return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
   }
 }

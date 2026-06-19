@@ -4,6 +4,7 @@ import { classroomStudents, quizzes, questions, options, quizAttempts, answers }
 import { and, eq, inArray, count } from "drizzle-orm";
 import { redirect, notFound } from "next/navigation";
 import QuizSessionClient from "./quiz-session-client";
+import { autoActivateIfScheduled } from "@/lib/quiz-utils";
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -38,12 +39,15 @@ export default async function QuizSessionPage({
   if (!enrollment) notFound();
 
   // Load quiz
-  const [quiz] = await db
+  const [rawQuiz] = await db
     .select()
     .from(quizzes)
     .where(and(eq(quizzes.id, quizId), eq(quizzes.classroomId, classroomId)))
     .limit(1);
-  if (!quiz) notFound();
+  if (!rawQuiz) notFound();
+
+  // Phase 2: lazy-activate if scheduled time has passed
+  const quiz = await autoActivateIfScheduled(rawQuiz);
 
   // Only ACTIVE quizzes can be attempted
   if (quiz.status !== "ACTIVE") {
