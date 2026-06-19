@@ -29,6 +29,10 @@ body {
 ::-webkit-scrollbar-track { background: #0a0a1a; }
 ::-webkit-scrollbar-thumb { background: #1d4ed8; border-radius: 3px; }
 
+/* ── Hide scrollbar but keep scrollability ─────────────── */
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
 /* ── Misc utility animations ────────────────────────────── */
 @keyframes shrink {
   from { width: 100%; }

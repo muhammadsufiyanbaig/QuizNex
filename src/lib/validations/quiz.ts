@@ -7,7 +7,7 @@ export const createQuizSchema = z.object({
   type: z.enum(["MCQ", "QA", "MIXED"]),
   totalMarks: z.number().int().positive(),
   timeLimitMins: z.number().int().min(1).max(360),
-  scheduledAt: z.string().datetime().optional(),
+  scheduledAt: z.string().datetime({ offset: true, local: true }).optional(),
   maxAttempts: z.number().int().min(1).max(10).default(1),
   shuffleQuestions: z.boolean().default(false),
   shuffleOptions: z.boolean().default(false),

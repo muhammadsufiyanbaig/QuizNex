@@ -1,7 +1,6 @@
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google      from "next-auth/providers/google";
-import Apple       from "next-auth/providers/apple";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, passkeyTokens } from "@/lib/db/schema";
@@ -106,12 +105,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google({
       clientId:     process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      allowDangerousEmailAccountLinking: true,
-    }),
-
-    Apple({
-      clientId:     process.env.APPLE_ID!,
-      clientSecret: process.env.APPLE_SECRET!,
       allowDangerousEmailAccountLinking: true,
     }),
   ],

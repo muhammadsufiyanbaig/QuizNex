@@ -8,9 +8,9 @@ const ROLE_HOME: Record<Role, string> = {
 };
 
 const ROLE_ALLOWED_PREFIXES: Record<Role, string[]> = {
-  STUDENT:      ["/student"],
-  TEACHER:      ["/teacher"],
-  ORGANIZATION: ["/organization"],
+  STUDENT:      ["/student",      "/settings"],
+  TEACHER:      ["/teacher",      "/settings"],
+  ORGANIZATION: ["/organization", "/settings"],
 };
 
 const PUBLIC_PATHS = [
@@ -114,6 +114,9 @@ export const authConfig: NextAuthConfig = {
       }
       if (!hasRole)  return Response.redirect(new URL("/setup-role", nextUrl));
       if (!has2FA)   return Response.redirect(new URL("/setup-2fa", nextUrl));
+
+      // API routes (non-auth) handle their own authz — skip role-prefix check
+      if (pathname.startsWith("/api/")) return true;
 
       // Wrong role → own home
       const allowed = ROLE_ALLOWED_PREFIXES[user!.role!];
