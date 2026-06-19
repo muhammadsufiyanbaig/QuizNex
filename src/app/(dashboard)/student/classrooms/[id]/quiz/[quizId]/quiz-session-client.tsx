@@ -359,8 +359,7 @@ export default function QuizSessionClient({
       const model = await faceLandmarksDetection.createDetector(
         faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
         {
-          runtime: "mediapipe",
-          solutionPath: "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4",
+          runtime: "tfjs",
           refineLandmarks: true, // enables iris indices 468 (left) and 473 (right)
           maxFaces: 1,
         }

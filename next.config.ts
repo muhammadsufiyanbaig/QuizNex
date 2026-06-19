@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  turbopack: {
+    resolveAlias: {
+      "@mediapipe/face_mesh": "./src/stubs/mediapipe-face-mesh.js",
+    },
+  },
 };
 
 export default nextConfig;
