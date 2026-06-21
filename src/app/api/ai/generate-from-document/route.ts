@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { quizzes, classrooms, aiDocuments } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { getObjectBuffer, getS3Url } from "@/lib/s3";
+import { getObjectBuffer, getObjectSize, getS3Url } from "@/lib/s3";
 import { generateQuestionsFromDocument } from "@/lib/ai/quiz-generator";
 
 const ALLOWED_MIME_TYPES: Record<string, "PDF" | "DOCX" | "TXT" | "PPT"> = {
@@ -73,6 +73,22 @@ export async function POST(req: Request) {
 
   if (!row) {
     return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
+  }
+
+  // Verify s3Key belongs to this teacher (prevent cross-teacher document reads)
+  if (!s3Key.startsWith(`ai-documents/${session.user.id}/`)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Server-side size guard — prevents OOM if client bypassed the presigned URL size enforcement
+  const MAX_BYTES = 20 * 1024 * 1024;
+  try {
+    const actualSize = await getObjectSize(s3Key);
+    if (actualSize > MAX_BYTES) {
+      return NextResponse.json({ error: "Uploaded file exceeds the 20 MB limit" }, { status: 413 });
+    }
+  } catch {
+    return NextResponse.json({ error: "Failed to verify uploaded file" }, { status: 500 });
   }
 
   // Download file from S3 (client already uploaded via presigned URL)

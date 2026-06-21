@@ -29,6 +29,11 @@ export async function GET(
 
   if (!classroom) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Organization accounts have no per-classroom access — use org analytics endpoints instead
+  if (session.user.role === "ORGANIZATION") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   // Teachers can see their own; students can see classrooms they're enrolled in
   if (session.user.role === "TEACHER" && classroom.teacherId !== session.user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -15,11 +15,9 @@ async function sendOtp(email: string, otp: string) {
   if (emailServiceConfigured) {
     await sendVerificationEmail(email, otp);
   } else {
-    // No SMTP configured — print OTP to server console for development
-    console.log(`\n========================================`);
-    console.log(`  📧  OTP for ${email}`);
-    console.log(`  Code: ${otp}`);
-    console.log(`========================================\n`);
+    // SMTP not configured — OTP is NOT logged to avoid leaking it to log aggregators.
+    // Set EMAIL_FROM and EMAIL_APP_PASSWORD to enable email delivery.
+    console.warn(`[register] SMTP not configured — verification email not sent for ${email}`);
   }
 }
 

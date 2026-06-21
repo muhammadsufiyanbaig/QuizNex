@@ -52,9 +52,19 @@ export default async function middleware(req: NextRequest) {
   }
 
   // Auth endpoints — 10 req / 60s per IP
+  // Covers sign-in, callbacks, session, registration, OTP, 2FA, and password reset paths.
+  // check-2fa is included here as it's an unauthenticated user-enumeration vector.
   if (
     path.startsWith("/api/auth/") &&
-    (path.includes("signin") || path.includes("callback") || path.includes("session"))
+    (path.includes("signin") ||
+      path.includes("callback") ||
+      path.includes("session") ||
+      path.includes("register") ||
+      path.includes("verify-email") ||
+      path.includes("check-2fa") ||
+      path.includes("forgot-password") ||
+      path.includes("reset-password") ||
+      path.includes("resend-verification"))
   ) {
     if (!rateLimit(`auth:${ip}`, 10, 60_000)) {
       return new NextResponse(

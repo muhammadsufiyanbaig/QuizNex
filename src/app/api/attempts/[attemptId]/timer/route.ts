@@ -29,9 +29,16 @@ export async function PATCH(
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
+  // Clamp to server-calculated elapsed time — prevents clients from submitting
+  // manipulated timer values (e.g. 0 to fake instant completion in analytics).
+  const serverElapsedSecs = Math.floor(
+    (Date.now() - new Date(attempt.startedAt).getTime()) / 1000
+  );
+  const timerElapsedSecs = Math.min(parsed.data.timerElapsedSecs, serverElapsedSecs);
+
   await db
     .update(quizAttempts)
-    .set({ timerElapsedSecs: parsed.data.timerElapsedSecs })
+    .set({ timerElapsedSecs })
     .where(eq(quizAttempts.id, attemptId));
 
   return NextResponse.json({ ok: true });

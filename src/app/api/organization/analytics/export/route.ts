@@ -116,10 +116,11 @@ export async function GET() {
   });
 
   function escapeCSV(val: string) {
-    if (val.includes(",") || val.includes('"') || val.includes("\n")) {
-      return `"${val.replace(/"/g, '""')}"`;
+    const neutralized = /^[=+\-@\t\r]/.test(val) ? `'${val}` : val;
+    if (neutralized.includes(",") || neutralized.includes('"') || neutralized.includes("\n")) {
+      return `"${neutralized.replace(/"/g, '""')}"`;
     }
-    return val;
+    return neutralized;
   }
 
   const csvLines = [header, ...rows]

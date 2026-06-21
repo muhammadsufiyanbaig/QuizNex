@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const s3 = new S3Client({
@@ -41,10 +41,21 @@ export async function deleteFromS3(key: string): Promise<void> {
 export async function getPresignedPutUrl(
   key: string,
   mimeType: string,
-  expiresInSecs = 300
+  expiresInSecs = 300,
+  maxBytes?: number
 ): Promise<string> {
-  const command = new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: mimeType });
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: mimeType,
+    ...(maxBytes !== undefined ? { ContentLength: maxBytes } : {}),
+  });
   return getSignedUrl(s3, command, { expiresIn: expiresInSecs });
+}
+
+export async function getObjectSize(key: string): Promise<number> {
+  const resp = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+  return resp.ContentLength ?? 0;
 }
 
 export async function getObjectBuffer(key: string): Promise<Buffer> {

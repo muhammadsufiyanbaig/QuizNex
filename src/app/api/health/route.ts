@@ -14,12 +14,11 @@ export async function GET() {
       latencyMs: Date.now() - start,
       ts: new Date().toISOString(),
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json(
       {
         status: "degraded",
         db: "error",
-        error: err instanceof Error ? err.message : String(err),
         ts: new Date().toISOString(),
       },
       { status: 503 }

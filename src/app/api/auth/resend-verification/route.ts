@@ -66,10 +66,8 @@ export async function POST(req: NextRequest) {
     if (emailServiceConfigured) {
       sendVerificationEmail(email, otp).catch(console.error);
     } else {
-      console.log(`\n========================================`);
-      console.log(`  📧  OTP (resend) for ${email}`);
-      console.log(`  Code: ${otp}`);
-      console.log(`========================================\n`);
+      // SMTP not configured — OTP is NOT logged to avoid leaking it to log aggregators.
+      console.warn(`[resend-verification] SMTP not configured — verification email not sent for ${email}`);
     }
 
     return SAFE;

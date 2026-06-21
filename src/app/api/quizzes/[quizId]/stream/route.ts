@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { quizzes } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { quizzes, classrooms, classroomStudents } from "@/lib/db/schema";
+import { and, eq, or, isNotNull } from "drizzle-orm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +14,32 @@ export async function GET(
   if (!session?.user) return new Response("Unauthorized", { status: 401 });
 
   const { quizId } = await params;
+
+  // Authorization: teacher who owns the classroom OR enrolled active student
+  const [access] = await db
+    .select({ quizId: quizzes.id })
+    .from(quizzes)
+    .innerJoin(classrooms, eq(quizzes.classroomId, classrooms.id))
+    .leftJoin(
+      classroomStudents,
+      and(
+        eq(classroomStudents.classroomId, classrooms.id),
+        eq(classroomStudents.studentId, session.user.id!),
+        eq(classroomStudents.status, "ACTIVE")
+      )
+    )
+    .where(
+      and(
+        eq(quizzes.id, quizId),
+        or(
+          eq(classrooms.teacherId, session.user.id!),
+          isNotNull(classroomStudents.studentId)
+        )
+      )
+    )
+    .limit(1);
+
+  if (!access) return new Response("Forbidden", { status: 403 });
 
   const encoder = new TextEncoder();
 

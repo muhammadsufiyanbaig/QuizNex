@@ -42,7 +42,8 @@ export async function POST(req: Request) {
   }
 
   const s3Key = `ai-documents/${session.user.id}/${randomUUID()}.${ext}`;
-  const uploadUrl = await getPresignedPutUrl(s3Key, mimeType!, 300);
+  // Pass fileSize so S3 enforces the exact byte count — uploads larger than declared are rejected
+  const uploadUrl = await getPresignedPutUrl(s3Key, mimeType!, 300, fileSize);
   const fileUrl = getS3Url(s3Key);
 
   return NextResponse.json({ uploadUrl, s3Key, fileUrl, fileName });

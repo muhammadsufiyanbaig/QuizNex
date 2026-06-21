@@ -11,10 +11,13 @@ import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 function escapeCSV(val: string): string {
-  if (val.includes(",") || val.includes('"') || val.includes("\n")) {
-    return `"${val.replace(/"/g, '""')}"`;
+  // Neutralize formula injection: cells starting with =, +, -, @, \t, \r
+  // are prefixed with a single quote so spreadsheet apps treat them as text.
+  const neutralized = /^[=+\-@\t\r]/.test(val) ? `'${val}` : val;
+  if (neutralized.includes(",") || neutralized.includes('"') || neutralized.includes("\n")) {
+    return `"${neutralized.replace(/"/g, '""')}"`;
   }
-  return val;
+  return neutralized;
 }
 
 export async function GET(

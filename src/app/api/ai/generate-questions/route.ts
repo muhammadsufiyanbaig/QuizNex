@@ -14,13 +14,15 @@ const bodySchema = z.object({
   quizType: z.enum(["MCQ", "QA", "MIXED"]),
   count: z.number().int().min(1).max(20),
   difficulty: z.enum(["EASY", "MEDIUM", "HARD"]),
+  // Only accept user turns from client — assistant turns are server-generated
   messages: z
     .array(
       z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string(),
+        role: z.literal("user"),
+        content: z.string().max(2000),
       })
     )
+    .max(20)
     .optional()
     .default([]),
 });

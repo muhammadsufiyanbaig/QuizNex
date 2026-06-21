@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, isNotNull, count } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { users, emailVerifications } from "@/lib/db/schema";
+
+// In-memory lockout: invalidate OTP after 5 failed attempts within a session.
+// Survives within a single Lambda instance lifetime — rate limiter in proxy.ts
+// provides the primary cross-instance protection (10 req/60s per IP).
+const failedAttempts = new Map<string, { count: number; since: number }>();
+const LOCKOUT_WINDOW_MS = 10 * 60 * 1000;
+const MAX_ATTEMPTS = 5;
+
+function checkAndRecordFailure(email: string): boolean {
+  const now = Date.now();
+  const entry = failedAttempts.get(email);
+  if (!entry || now - entry.since > LOCKOUT_WINDOW_MS) {
+    failedAttempts.set(email, { count: 1, since: now });
+    return false;
+  }
+  entry.count++;
+  return entry.count > MAX_ATTEMPTS;
+}
+
+function clearFailures(email: string) {
+  failedAttempts.delete(email);
+}
 
 const schema = z.object({
   email: z.string().email(),
@@ -23,6 +45,13 @@ export async function POST(req: NextRequest) {
 
     const { email, otp } = parsed.data;
     const normalizedEmail = email.toLowerCase();
+
+    if (checkAndRecordFailure(normalizedEmail)) {
+      return NextResponse.json(
+        { error: "Too many failed attempts. Please request a new verification code." },
+        { status: 429 }
+      );
+    }
 
     // Find the user
     const [user] = await db
@@ -76,6 +105,7 @@ export async function POST(req: NextRequest) {
         .where(eq(emailVerifications.id, record.id)),
     ]);
 
+    clearFailures(normalizedEmail);
     return NextResponse.json({ message: "Email verified successfully." });
   } catch (err) {
     console.error("Verify OTP error:", err);
