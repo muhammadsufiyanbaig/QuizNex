@@ -5,7 +5,11 @@
       "Bash(cp -r quiznex-temp/. QuizNex/)",
       "Bash(rm -rf quiznex-temp)",
       "Bash(cd:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:safepay-docs.netlify.app)",
+      "WebFetch(domain:apidocs.getsafepay.com)",
+      "PowerShell(npx tsc --noEmit --project \"C:\\\\Users\\\\I-TECH\\\\OneDrive\\\\Desktop\\\\Projects\\\\Applications\\\\QuizNex\\\\tsconfig.json\" 2>&1 | Select-Object -First 50)",
+      "PowerShell(npx tsc --noEmit --project \"C:\\\\Users\\\\I-TECH\\\\OneDrive\\\\Desktop\\\\Projects\\\\Applications\\\\QuizNex\\\\tsconfig.json\" 2>&1 | Select-Object -First 40)"
     ]
   }
 }

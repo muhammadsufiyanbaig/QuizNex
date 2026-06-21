@@ -18,7 +18,7 @@ import { relations } from "drizzle-orm";
 // Enums
 // ─────────────────────────────────────────────
 
-export const roleEnum = pgEnum("role", ["STUDENT", "TEACHER", "ORGANIZATION"]);
+export const roleEnum = pgEnum("role", ["STUDENT", "TEACHER", "ORGANIZATION", "ADMIN"]);
 
 export const orgTeacherStatusEnum = pgEnum("org_teacher_status", [
   "PENDING",
@@ -79,6 +79,34 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "ORG_INVITE_ACCEPTED",
   "ORG_INVITE_DECLINED",
   "STUDENT_REMOVED",
+  "SYSTEM_ANNOUNCEMENT",
+]);
+
+export const planEnum = pgEnum("plan", [
+  "FREE",
+  "GOLD",
+  "PLATINUM",
+  "ORG_STARTER",
+  "ORG_GROWTH",
+  "ORG_ENTERPRISE",
+]);
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "ACTIVE",
+  "TRIAL",
+  "EXPIRED",
+  "CANCELLED",
+]);
+
+export const subscriptionPeriodEnum = pgEnum("subscription_period", [
+  "MONTHLY",
+  "YEARLY",
+]);
+
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "PENDING",
+  "SUCCEEDED",
+  "FAILED",
 ]);
 
 // ─────────────────────────────────────────────
@@ -92,10 +120,12 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: varchar("password_hash", { length: 255 }),  // null for OAuth users
   role: roleEnum("role"),                                    // null until selected (new OAuth users)
+  status: varchar("status", { length: 20 }).default("ACTIVE").notNull(), // ACTIVE | SUSPENDED
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: varchar("image", { length: 500 }),
   twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
   twoFactorSecret: varchar("two_factor_secret", { length: 500 }),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -509,4 +539,66 @@ export const notifications = pgTable("notifications", {
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+// ── AdminAuditLog ──────────────────────────────
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id:         uuid("id").primaryKey().defaultRandom(),
+  adminId:    uuid("admin_id").notNull().references(() => users.id),
+  action:     varchar("action", { length: 100 }).notNull(),
+  targetType: varchar("target_type", { length: 50 }),   // user | classroom | quiz | attempt | org
+  targetId:   uuid("target_id"),
+  metadata:   json("metadata"),
+  ip:         varchar("ip", { length: 50 }),
+  createdAt:  timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("idx_admin_audit_log_admin_id").on(t.adminId),
+  index("idx_admin_audit_log_created_at").on(t.createdAt),
+]);
+
+export const adminAuditLogRelations = relations(adminAuditLog, ({ one }) => ({
+  admin: one(users, { fields: [adminAuditLog.adminId], references: [users.id] }),
+}));
+
+// ── Subscription ───────────────────────────────
+export const subscriptions = pgTable("subscriptions", {
+  id:                 uuid("id").primaryKey().defaultRandom(),
+  userId:             uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  plan:               planEnum("plan").notNull().default("FREE"),
+  status:             subscriptionStatusEnum("status").notNull().default("ACTIVE"),
+  period:             subscriptionPeriodEnum("period"),                    // null for FREE
+  currentPeriodStart: timestamp("current_period_start").notNull().defaultNow(),
+  currentPeriodEnd:   timestamp("current_period_end"),                    // null = no expiry (FREE)
+  trialEndsAt:        timestamp("trial_ends_at"),                         // org 30-day trial
+  cancelledAt:        timestamp("cancelled_at"),
+  createdAt:          timestamp("created_at").defaultNow().notNull(),
+  updatedAt:          timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("idx_subscriptions_user_id").on(t.userId),
+]);
+
+// ── Payment ────────────────────────────────────
+export const payments = pgTable("payments", {
+  id:               uuid("id").primaryKey().defaultRandom(),
+  userId:           uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  trackerToken:     varchar("tracker_token", { length: 255 }).notNull().unique(),
+  plan:             planEnum("plan").notNull(),
+  period:           subscriptionPeriodEnum("period").notNull(),
+  amountPkr:        integer("amount_pkr").notNull(),                       // whole PKR, not paisa
+  status:           paymentStatusEnum("status").notNull().default("PENDING"),
+  safepayReference: varchar("safepay_reference", { length: 255 }),        // Safepay internal ref
+  metadata:         json("metadata"),
+  createdAt:        timestamp("created_at").defaultNow().notNull(),
+  updatedAt:        timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("idx_payments_user_id").on(t.userId),
+  index("idx_payments_tracker").on(t.trackerToken),
+]);
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, { fields: [subscriptions.userId], references: [users.id] }),
+}));
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  user: one(users, { fields: [payments.userId], references: [users.id] }),
 }));

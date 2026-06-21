@@ -444,9 +444,9 @@ export default function LoginForm() {
 
       <p className="mt-6 text-center text-xs text-slate-600">
         By signing in you agree to our{" "}
-        <span className="text-slate-500 hover:text-slate-400 cursor-pointer">Terms of Service</span>
+        <Link href="/terms" className="text-slate-500 hover:text-slate-400 transition-colors">Terms of Service</Link>
         {" "}and{" "}
-        <span className="text-slate-500 hover:text-slate-400 cursor-pointer">Privacy Policy</span>
+        <Link href="/privacy" className="text-slate-500 hover:text-slate-400 transition-colors">Privacy Policy</Link>
       </p>
     </>
   );

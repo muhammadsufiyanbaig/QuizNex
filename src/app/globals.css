@@ -118,3 +118,49 @@ body {
 .btn-gradient:active {
   transform: translateY(0);
 }
+
+/* ── Landing page extras ───────────────────────────────── */
+@keyframes gradient-border {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1; }
+}
+
+@keyframes float-card {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+.animate-float-card { animation: float-card 6s ease-in-out infinite; }
+.animate-gradient-border { animation: gradient-border 3s ease-in-out infinite; }
+
+.feature-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+.feature-card:hover {
+  background: rgba(59,130,246,0.05);
+  border-color: rgba(59,130,246,0.2);
+  transform: translateY(-4px);
+}
+
+.glow-blue {
+  box-shadow: 0 0 40px rgba(59,130,246,0.15), 0 0 80px rgba(59,130,246,0.05);
+}
+
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.5), rgba(129,140,248,0.3), transparent);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}

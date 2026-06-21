@@ -56,6 +56,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
           if (!user) return null;
 
+          // ADMIN accounts must use email + password + TOTP — never passkey alone
+          if (user.role === "ADMIN") return null;
+
           return {
             id:               user.id,
             name:             user.name,
@@ -84,6 +87,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const passwordValid = await verifyPassword(password, user.passwordHash);
         if (!passwordValid) return null;
+
+        // ADMIN accounts: 2FA is mandatory — block sign-in if not set up
+        if (user.role === "ADMIN" && !user.twoFactorEnabled) {
+          throw new Error("ADMIN accounts must have 2FA enabled. Contact the system administrator.");
+        }
 
         if (user.twoFactorEnabled) {
           if (!totpCode || totpCode.length !== 6) throw new InvalidTotpError();
@@ -121,6 +129,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.email, email))
           .limit(1);
 
+        // Block OAuth sign-in for ADMIN accounts — must use credentials + 2FA
+        if (existing?.role === "ADMIN") {
+          throw new Error("ADMIN accounts must sign in with email and password.");
+        }
+
         if (existing) {
           token.id               = existing.id;
           token.role             = existing.role as Role | null;
@@ -149,6 +162,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id               = user.id as string;
         token.role             = (user as { role: Role | null }).role ?? null;
         token.twoFactorEnabled = (user as { twoFactorEnabled: boolean }).twoFactorEnabled ?? false;
+        // Track last login time
+        await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id as string));
       }
 
       // ── Session update (2FA enable, role set) ──────────────

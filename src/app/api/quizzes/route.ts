@@ -1,9 +1,11 @@
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { classrooms, quizzes } from "@/lib/db/schema";
-import { and, eq, max } from "drizzle-orm";
+import { and, count, eq, max } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createQuizSchema } from "@/lib/validations/quiz";
+import { getActiveSubscription } from "@/lib/plans/subscription";
+import { getLimits } from "@/lib/plans/limits";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -24,6 +26,29 @@ export async function POST(req: Request) {
     .limit(1);
 
   if (!classroom) return NextResponse.json({ error: "Classroom not found" }, { status: 404 });
+
+  // Plan limit check
+  const sub    = await getActiveSubscription(session.user.id, session.user.role ?? "TEACHER");
+  const limits = getLimits(sub.plan);
+
+  if (sub.isExpired) {
+    return NextResponse.json(
+      { error: "Your subscription has expired. Please renew to create quizzes.", code: "SUBSCRIPTION_EXPIRED" },
+      { status: 402 }
+    );
+  }
+
+  const [{ quizCount }] = await db
+    .select({ quizCount: count() })
+    .from(quizzes)
+    .where(eq(quizzes.classroomId, classroomId));
+
+  if (quizCount >= limits.quizzesPerClassroom) {
+    return NextResponse.json(
+      { error: `Your plan allows a maximum of ${limits.quizzesPerClassroom} quizzes per classroom. Upgrade to create more.`, code: "QUIZ_LIMIT_REACHED" },
+      { status: 403 }
+    );
+  }
 
   // Get next displayOrder
   const [{ maxOrder }] = await db

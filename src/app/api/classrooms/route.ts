@@ -1,10 +1,12 @@
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { classrooms } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateJoinKey } from "@/lib/auth/utils";
+import { getActiveSubscription } from "@/lib/plans/subscription";
+import { getLimits } from "@/lib/plans/limits";
 
 const createSchema = z.object({
   name:        z.string().min(1).max(255).trim(),
@@ -34,6 +36,29 @@ export async function POST(req: Request) {
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+
+  // Plan limit check
+  const sub    = await getActiveSubscription(session.user.id, session.user.role ?? "TEACHER");
+  const limits = getLimits(sub.plan);
+
+  if (sub.isExpired) {
+    return NextResponse.json(
+      { error: "Your subscription has expired. Please renew to create classrooms.", code: "SUBSCRIPTION_EXPIRED" },
+      { status: 402 }
+    );
+  }
+
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(classrooms)
+    .where(eq(classrooms.teacherId, session.user.id));
+
+  if (total >= limits.classrooms) {
+    return NextResponse.json(
+      { error: `Your plan allows a maximum of ${limits.classrooms} classrooms. Upgrade to create more.`, code: "CLASSROOM_LIMIT_REACHED" },
+      { status: 403 }
+    );
+  }
 
   const joinKey = generateJoinKey();
 

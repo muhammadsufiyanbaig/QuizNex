@@ -38,6 +38,11 @@ const ROLE_META: Record<Role, { label: string; icon: React.ReactNode; color: str
     icon: <Building2 className="h-4 w-4" />,
     color: "bg-violet-500/10 text-violet-400 ring-1 ring-violet-500/20",
   },
+  ADMIN: {
+    label: "Admin",
+    icon: <ShieldCheck className="h-4 w-4" />,
+    color: "bg-red-500/10 text-red-400 ring-1 ring-red-500/20",
+  },
 };
 
 type ProfilePageProps = {

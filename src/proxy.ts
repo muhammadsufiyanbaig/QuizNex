@@ -41,6 +41,16 @@ export default async function middleware(req: NextRequest) {
     "unknown";
   const path = req.nextUrl.pathname;
 
+  // Admin endpoints — 60 req / 60s per IP (authenticated, but still limit bulk scraping)
+  if (path.startsWith("/api/admin/")) {
+    if (!rateLimit(`admin:${ip}`, 60, 60_000)) {
+      return new NextResponse(
+        JSON.stringify({ error: "Too many admin requests. Slow down." }),
+        { status: 429, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }
+
   // AI endpoints — 20 req / 60s per IP
   if (path.startsWith("/api/ai/")) {
     if (!rateLimit(`ai:${ip}`, 20, 60_000)) {

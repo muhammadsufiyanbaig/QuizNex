@@ -21,7 +21,7 @@ import { registerSchema, type RegisterInput } from "@/lib/validations/auth";
 import type { Role } from "@/types/auth";
 
 const ROLES: {
-  value: Role;
+  value: Exclude<Role, "ADMIN">;
   label: string;
   description: string;
   icon: React.ReactNode;

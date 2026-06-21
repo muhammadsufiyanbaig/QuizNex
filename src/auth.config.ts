@@ -5,12 +5,14 @@ const ROLE_HOME: Record<Role, string> = {
   STUDENT:      "/student",
   TEACHER:      "/teacher",
   ORGANIZATION: "/organization",
+  ADMIN:        "/admin",
 };
 
 const ROLE_ALLOWED_PREFIXES: Record<Role, string[]> = {
   STUDENT:      ["/student",      "/settings"],
   TEACHER:      ["/teacher",      "/settings"],
   ORGANIZATION: ["/organization", "/settings"],
+  ADMIN:        ["/admin",        "/settings"],
 };
 
 const PUBLIC_PATHS = [
@@ -20,6 +22,11 @@ const PUBLIC_PATHS = [
   "/forgot-password",
   "/reset-password",
   "/api/auth",
+  "/privacy",
+  "/terms",
+  "/pricing",
+  "/payments",
+  "/api/payments/webhook",
 ];
 
 function isPublic(pathname: string): boolean {
@@ -72,7 +79,6 @@ export const authConfig: NextAuthConfig = {
       if (pathname === "/setup-role") {
         if (!isAuthenticated) return Response.redirect(new URL("/login", nextUrl));
         if (hasRole) {
-          // Role already set — move to next step
           return Response.redirect(
             new URL(has2FA ? ROLE_HOME[user!.role!] : "/setup-2fa", nextUrl)
           );
@@ -81,6 +87,7 @@ export const authConfig: NextAuthConfig = {
       }
 
       // ── /setup-2fa: only for authenticated users with role but no 2FA ──
+      // ADMIN: 2FA is mandatory — they are NOT exempt from this step
       if (pathname === "/setup-2fa") {
         if (!isAuthenticated) return Response.redirect(new URL("/login", nextUrl));
         if (!hasRole) return Response.redirect(new URL("/setup-role", nextUrl));
@@ -88,9 +95,9 @@ export const authConfig: NextAuthConfig = {
         return true;
       }
 
-      // ── Root redirect ─────────────────────────────────────────────
+      // ── Root: landing page (public) → redirect authenticated users ──
       if (pathname === "/") {
-        if (!isAuthenticated) return Response.redirect(new URL("/login", nextUrl));
+        if (!isAuthenticated) return true; // show landing page
         if (!hasRole)  return Response.redirect(new URL("/setup-role", nextUrl));
         if (!has2FA)   return Response.redirect(new URL("/setup-2fa", nextUrl));
         return Response.redirect(new URL(ROLE_HOME[user!.role!], nextUrl));
