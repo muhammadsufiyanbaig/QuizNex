@@ -4,9 +4,13 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 export const s3 = new S3Client({
   region: process.env.S3_REGION!,
   credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+    accessKeyId:     process.env.S3_ACCESS_KEY_ID!,
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
   },
+  // Disable automatic checksum injection — browser PUT via presigned URL
+  // won't send the checksum header, causing S3 to reject with 400.
+  requestChecksumCalculation: "when_required",
+  responseChecksumValidation: "when_required",
 });
 
 const BUCKET = process.env.S3_BUCKET_NAME!;

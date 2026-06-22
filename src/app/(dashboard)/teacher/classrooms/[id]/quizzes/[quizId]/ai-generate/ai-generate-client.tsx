@@ -145,13 +145,21 @@ export default function AiGenerateClient({ quiz, classroomId }: Props) {
       }
 
       // Step 2: Upload directly to S3 (browser → S3, no Lambda memory cost)
-      const uploadRes = await fetch(presignData.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
+      let uploadRes: Response;
+      try {
+        uploadRes = await fetch(presignData.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+      } catch (uploadErr) {
+        const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+        setError(`File upload failed (CORS or network issue): ${msg}`);
+        return;
+      }
       if (!uploadRes.ok) {
-        setError("Failed to upload file to storage");
+        const body = await uploadRes.text().catch(() => "");
+        setError(`S3 rejected upload (${uploadRes.status}): ${body.slice(0, 200) || "unknown error"}`);
         return;
       }
 
@@ -381,7 +389,7 @@ export default function AiGenerateClient({ quiz, classroomId }: Props) {
                 <AlertCircle className="h-5 w-5 text-red-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-red-300 mb-1">Claude API Error</p>
+                <p className="text-sm font-semibold text-red-300 mb-1">AI Error</p>
                 <p className="text-sm text-red-400/80 wrap-break-word">{error}</p>
               </div>
               <button
