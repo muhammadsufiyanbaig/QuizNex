@@ -9,8 +9,8 @@ export const s3 = new S3Client({
   },
   // Disable automatic checksum injection — browser PUT via presigned URL
   // won't send the checksum header, causing S3 to reject with 400.
-  requestChecksumCalculation: "when_required",
-  responseChecksumValidation: "when_required",
+  requestChecksumCalculation: "WHEN_REQUIRED",
+  responseChecksumValidation: "WHEN_REQUIRED",
 });
 
 const BUCKET = process.env.S3_BUCKET_NAME!;
