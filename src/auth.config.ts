@@ -52,6 +52,7 @@ type AuthUser = {
  */
 export const authConfig: NextAuthConfig = {
   providers: [],
+  trustHost: true,
 
   pages: {
     signIn: "/login",
