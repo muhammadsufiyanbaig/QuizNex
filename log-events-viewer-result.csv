@@ -1,0 +1,115 @@
+timestamp,message
+1782127408566,"START RequestId: 0355936a-9f1c-48d4-90bb-6132a6970433 Version: $LATEST
+"
+1782127408567,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127408692,"[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://master.d35mzghzdo85dp.amplifyapp.com/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+"
+1782127408692,"at /var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:51334     at sT (/var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:54029)     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+"
+1782127408726,"⨯ Error: No database connection string was provided to `neon()`. Perhaps an environment variable has not been set?     at neon (../../var/task/.next/server/chunks/_dcc33162._.js:15:8522)     at module evaluation (../../var/task/.next/server/chunks/_dcc33162._.js:26:64389)     at instantiateModule (../../var/task/.next/server/chunks/[turbopack]_runtime.js:740:9)     at getOrInstantiateModuleFromParent (../../var/task/.next/server/chunks/[turbopack]_runtime.js:763:12)     at Context.esmImport [as i] (../../var/task/.next/server/chunks/[turbopack]_runtime.js:228:20)     at module evaluation (../../var/task/.next/server/chunks/_95e5d204._.js:405:61075)     at instantiateModule (../../var/task/.next/server/chunks/[turbopack]_runtime.js:740:9)     at getOrInstantiateModuleFromParent (../../var/task/.next/server/chunks/[turbopack]_runtime.js:763:12)     at Context.esmImport [as i] (../../var/task/.next/server/chunks/[turbopack]_runtime.js:228:20)     at module evaluation (../../var/task/.next/server/chunks/[root-of-the-server]__69cdc8b5._.js:2:2762)
+"
+1782127408744,"REPORT RequestId: 0355936a-9f1c-48d4-90bb-6132a6970433	Duration: 177.04 ms	Billed Duration: 2258 ms	Memory Size: 1024 MB	Max Memory Used: 176 MB	Init Duration: 2080.68 ms	
+"
+1782127409189,"START RequestId: 6a0c30d6-bf29-4b44-aa3a-e81ac0d4b29e Version: $LATEST
+"
+1782127409190,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127409196,"[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://master.d35mzghzdo85dp.amplifyapp.com/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+"
+1782127409196,"at /var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:51334     at sT (/var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:54029)     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+"
+1782127409200,"⨯ Error: No database connection string was provided to `neon()`. Perhaps an environment variable has not been set?     at neon (../../var/task/.next/server/chunks/_dcc33162._.js:15:8522)     at module evaluation (../../var/task/.next/server/chunks/_dcc33162._.js:26:64389)     at instantiateModule (../../var/task/.next/server/chunks/[turbopack]_runtime.js:740:9)     at getOrInstantiateModuleFromParent (../../var/task/.next/server/chunks/[turbopack]_runtime.js:763:12)     at Context.esmImport [as i] (../../var/task/.next/server/chunks/[turbopack]_runtime.js:228:20)     at module evaluation (../../var/task/.next/server/chunks/_95e5d204._.js:405:61075)     at instantiateModule (../../var/task/.next/server/chunks/[turbopack]_runtime.js:740:9)     at getOrInstantiateModuleFromParent (../../var/task/.next/server/chunks/[turbopack]_runtime.js:763:12)     at Context.esmImport [as i] (../../var/task/.next/server/chunks/[turbopack]_runtime.js:228:20)     at module evaluation (../../var/task/.next/server/chunks/[root-of-the-server]__69cdc8b5._.js:2:2762)
+"
+1782127409205,"REPORT RequestId: 6a0c30d6-bf29-4b44-aa3a-e81ac0d4b29e	Duration: 15.28 ms	Billed Duration: 16 ms	Memory Size: 1024 MB	Max Memory Used: 176 MB	
+"
+1782127412221,"START RequestId: 52423ba8-f776-41d2-83d7-6725d61a260b Version: $LATEST
+"
+1782127412222,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127412226,"[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://master.d35mzghzdo85dp.amplifyapp.com/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+"
+1782127412226,"at /var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:51334     at sT (/var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:54029)     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+"
+1782127412290,"REPORT RequestId: 52423ba8-f776-41d2-83d7-6725d61a260b	Duration: 67.72 ms	Billed Duration: 68 ms	Memory Size: 1024 MB	Max Memory Used: 177 MB	
+"
+1782127426677,"START RequestId: 7de6d508-8977-42f0-a541-f24e957f55c2 Version: $LATEST
+"
+1782127426678,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127426685,"[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://master.d35mzghzdo85dp.amplifyapp.com/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+"
+1782127426685,"at /var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:51334     at sT (/var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:54029)     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+"
+1782127426705,"⨯ Error: No database connection string was provided to `neon()`. Perhaps an environment variable has not been set?     at neon (../../var/task/.next/server/chunks/_dcc33162._.js:15:8522)     at module evaluation (../../var/task/.next/server/chunks/_dcc33162._.js:26:64389)     at instantiateModule (../../var/task/.next/server/chunks/[turbopack]_runtime.js:740:9)     at getOrInstantiateModuleFromParent (../../var/task/.next/server/chunks/[turbopack]_runtime.js:763:12)     at Context.esmImport [as i] (../../var/task/.next/server/chunks/[turbopack]_runtime.js:228:20)     at module evaluation (../../var/task/.next/server/chunks/_95e5d204._.js:405:61075)     at instantiateModule (../../var/task/.next/server/chunks/[turbopack]_runtime.js:740:9)     at getOrInstantiateModuleFromParent (../../var/task/.next/server/chunks/[turbopack]_runtime.js:763:12)     at Context.esmImport [as i] (../../var/task/.next/server/chunks/[turbopack]_runtime.js:228:20)     at module evaluation (../../var/task/.next/server/chunks/[root-of-the-server]__69cdc8b5._.js:2:2762)
+"
+1782127426725,"REPORT RequestId: 7de6d508-8977-42f0-a541-f24e957f55c2	Duration: 47.24 ms	Billed Duration: 48 ms	Memory Size: 1024 MB	Max Memory Used: 177 MB	
+"
+1782127435165,"START RequestId: 08517fba-b40e-4990-8fc3-5d997d0f8882 Version: $LATEST
+"
+1782127435165,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127435266,"[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://master.d35mzghzdo85dp.amplifyapp.com/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+"
+1782127435267,"at /var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:51334     at sT (/var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:54029)     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+"
+1782127435309,"REPORT RequestId: 08517fba-b40e-4990-8fc3-5d997d0f8882	Duration: 144.08 ms	Billed Duration: 145 ms	Memory Size: 1024 MB	Max Memory Used: 178 MB	
+"
+1782127436096,"START RequestId: b241964a-38af-483f-82d5-c5f9a3b97c2d Version: $LATEST
+"
+1782127436096,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127436125,"[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://master.d35mzghzdo85dp.amplifyapp.com/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+"
+1782127436125,"at /var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:51334     at sT (/var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:54029)     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+"
+1782127436166,"⨯ Error: No database connection string was provided to `neon()`. Perhaps an environment variable has not been set?     at neon (../../var/task/.next/server/chunks/_dcc33162._.js:15:8522)     at module evaluation (../../var/task/.next/server/chunks/_dcc33162._.js:26:64389)     at instantiateModule (../../var/task/.next/server/chunks/[turbopack]_runtime.js:740:9)     at getOrInstantiateModuleFromParent (../../var/task/.next/server/chunks/[turbopack]_runtime.js:763:12)     at Context.esmImport [as i] (../../var/task/.next/server/chunks/[turbopack]_runtime.js:228:20)     at module evaluation (../../var/task/.next/server/chunks/_95e5d204._.js:405:61075)     at instantiateModule (../../var/task/.next/server/chunks/[turbopack]_runtime.js:740:9)     at getOrInstantiateModuleFromParent (../../var/task/.next/server/chunks/[turbopack]_runtime.js:763:12)     at Context.esmImport [as i] (../../var/task/.next/server/chunks/[turbopack]_runtime.js:228:20)     at module evaluation (../../var/task/.next/server/chunks/[root-of-the-server]__69cdc8b5._.js:2:2762)
+"
+1782127436227,"REPORT RequestId: b241964a-38af-483f-82d5-c5f9a3b97c2d	Duration: 131.23 ms	Billed Duration: 132 ms	Memory Size: 1024 MB	Max Memory Used: 178 MB	
+"
+1782127436231,"START RequestId: 235108f5-e8ec-4233-a0ff-28aff004ce69 Version: $LATEST
+"
+1782127436232,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127436243,"[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://master.d35mzghzdo85dp.amplifyapp.com/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+"
+1782127436243,"at /var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:51334     at sT (/var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:54029)     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+"
+1782127436286,"REPORT RequestId: 235108f5-e8ec-4233-a0ff-28aff004ce69	Duration: 54.42 ms	Billed Duration: 55 ms	Memory Size: 1024 MB	Max Memory Used: 178 MB	
+"
+1782127436290,"START RequestId: d59c54c4-6ac1-46a4-b636-db7d605bd234 Version: $LATEST
+"
+1782127436291,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127436294,"[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://master.d35mzghzdo85dp.amplifyapp.com/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+"
+1782127436294,"at /var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:51334     at sT (/var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:54029)     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+"
+1782127436327,"REPORT RequestId: d59c54c4-6ac1-46a4-b636-db7d605bd234	Duration: 35.97 ms	Billed Duration: 36 ms	Memory Size: 1024 MB	Max Memory Used: 178 MB	
+"
+1782127436354,"START RequestId: 27b4f6d5-b056-4a22-a03e-cf32db930c56 Version: $LATEST
+"
+1782127436354,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127436385,"REPORT RequestId: 27b4f6d5-b056-4a22-a03e-cf32db930c56	Duration: 30.53 ms	Billed Duration: 31 ms	Memory Size: 1024 MB	Max Memory Used: 178 MB	
+"
+1782127437240,"START RequestId: 0eb43265-ecd7-4527-b97c-4c05d8959f8b Version: $LATEST
+"
+1782127437241,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127437244,"[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://master.d35mzghzdo85dp.amplifyapp.com/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+"
+1782127437244,"at /var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:51334     at sT (/var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:54029)     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+"
+1782127437268,"REPORT RequestId: 0eb43265-ecd7-4527-b97c-4c05d8959f8b	Duration: 27.69 ms	Billed Duration: 28 ms	Memory Size: 1024 MB	Max Memory Used: 178 MB	
+"
+1782127437336,"START RequestId: 0ab24798-7459-47b7-a94b-9ca302eecdff Version: $LATEST
+"
+1782127437336,"Starting request using compute deployment_id: ae9477b5-fde4-48f0-ba7b-dec51d90412f and compute version: $LATEST
+"
+1782127437339,"[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://master.d35mzghzdo85dp.amplifyapp.com/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+"
+1782127437339,"at /var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:51334     at sT (/var/task/.next/server/chunks/[root-of-the-server]__8180faae._.js:430:54029)     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+"
+1782127437349,"REPORT RequestId: 0ab24798-7459-47b7-a94b-9ca302eecdff	Duration: 12.97 ms	Billed Duration: 13 ms	Memory Size: 1024 MB	Max Memory Used: 178 MB	
+"
