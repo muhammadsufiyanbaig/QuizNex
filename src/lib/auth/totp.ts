@@ -6,8 +6,8 @@ const APP_NAME = "QuizNex";
 
 // ── Encryption (AES-256-GCM) ───────────────────────────────────────────────
 function getEncryptionKey(): Buffer {
-  const secret = process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET;
-  if (!secret) throw new Error("NEXTAUTH_SECRET environment variable is required for TOTP encryption");
+  const secret = process.env.APP_SECRET;
+  if (!secret) throw new Error("APP_SECRET environment variable is required for TOTP encryption");
   return crypto.createHash("sha256").update(secret).digest();
 }
 

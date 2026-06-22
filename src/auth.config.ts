@@ -159,5 +159,5 @@ export const authConfig: NextAuthConfig = {
     },
   },
 
-  secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+  secret: process.env.APP_SECRET,
 };
