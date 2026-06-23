@@ -107,6 +107,16 @@ export const authConfig: NextAuthConfig = {
 
       // ── Public auth pages ─────────────────────────────────────────
       if (isPublic(pathname)) {
+        // Pricing and payment pages must be accessible to authenticated users
+        // — pricing for upgrades, payments/* for post-Safepay plan activation.
+        // Redirecting away would break the checkout flow entirely.
+        if (
+          pathname === "/pricing" ||
+          pathname.startsWith("/pricing/") ||
+          pathname.startsWith("/payments")
+        ) {
+          return true;
+        }
         if (isAuthenticated && !pathname.startsWith("/api")) {
           if (!hasRole)  return Response.redirect(new URL("/setup-role", nextUrl));
           if (!has2FA)   return Response.redirect(new URL("/setup-2fa", nextUrl));
@@ -114,6 +124,9 @@ export const authConfig: NextAuthConfig = {
         }
         return true;
       }
+
+      // API routes handle their own authz — never redirect to login page
+      if (pathname.startsWith("/api/")) return true;
 
       // ── Protected dashboard pages ─────────────────────────────────
       if (!isAuthenticated) {
@@ -123,9 +136,6 @@ export const authConfig: NextAuthConfig = {
       }
       if (!hasRole)  return Response.redirect(new URL("/setup-role", nextUrl));
       if (!has2FA)   return Response.redirect(new URL("/setup-2fa", nextUrl));
-
-      // API routes (non-auth) handle their own authz — skip role-prefix check
-      if (pathname.startsWith("/api/")) return true;
 
       // Wrong role → own home
       const allowed = ROLE_ALLOWED_PREFIXES[user!.role!];

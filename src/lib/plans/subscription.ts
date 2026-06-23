@@ -30,7 +30,7 @@ const FREE_SUB = (userId: string): ActiveSubscription => ({
 /**
  * Get the user's current subscription.
  * - TEACHER with no row → returns virtual FREE plan.
- * - ORGANIZATION with no row → auto-creates 30-day trial on ORG_STARTER.
+ * - ORGANIZATION with no row → auto-creates 15-day trial on ORG_STARTER.
  * - Expired rows are marked EXPIRED in DB and returned with isExpired=true.
  */
 export async function getActiveSubscription(
@@ -45,7 +45,7 @@ export async function getActiveSubscription(
 
   if (!sub) {
     if (role === "ORGANIZATION") {
-      const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const trialEndsAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
       const [newSub] = await db
         .insert(subscriptions)
         .values({

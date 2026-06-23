@@ -5,10 +5,11 @@ const HOST =
     ? "https://api.getsafepay.com"
     : "https://sandbox.api.getsafepay.com";
 
-function authHeaders() {
+function merchantHeaders() {
   return {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${process.env.SAFEPAY_SECRET_KEY}`,
+    // SDK authType "secret" uses x-sfpy-merchant-secret, not Authorization: Bearer
+    "x-sfpy-merchant-secret": process.env.SAFEPAY_SECRET_KEY!,
   };
 }
 
@@ -16,20 +17,16 @@ function authHeaders() {
  * Step 1: Create a payment tracker session.
  * Returns the tracker token (track_xxx).
  */
-export async function createPaymentSession(
-  amountPkr: number,
-  metadata: Record<string, string>
-): Promise<string> {
+export async function createPaymentSession(amountPkr: number): Promise<string> {
   const res = await fetch(`${HOST}/order/payments/v3/`, {
     method: "POST",
-    headers: authHeaders(),
+    headers: merchantHeaders(),
     body: JSON.stringify({
       merchant_api_key: process.env.SAFEPAY_PUBLIC_KEY,
       intent: "CYBERSOURCE",
       mode: "payment",
       currency: "PKR",
       amount: amountPkr * 100, // PKR → paisa
-      metadata,
     }),
   });
   if (!res.ok) {
@@ -41,25 +38,27 @@ export async function createPaymentSession(
 }
 
 /**
- * Step 2: Get a short-lived bearer token (tbt) for the checkout URL.
- * Expires in 1 hour.
+ * Step 2: Create a Time-Based Token (TBT) for authenticating the checkout app.
+ * Required for the /embedded/ hosted checkout to load the tracker.
  */
-export async function getAuthToken(): Promise<string> {
+export async function createTBT(): Promise<string> {
   const res = await fetch(`${HOST}/client/passport/v1/token`, {
     method: "POST",
-    headers: authHeaders(),
+    headers: merchantHeaders(),
+    body: "{}",
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Safepay auth token error ${res.status}: ${text}`);
+    throw new Error(`Safepay TBT error ${res.status}: ${text}`);
   }
   const json = await res.json();
+  // Response: { "data": "<tbt_string>" }
   return json.data as string;
 }
 
 /**
- * Step 3: Build the hosted checkout URL.
- * User is redirected here to complete payment.
+ * Step 3: Build the hosted checkout URL using Safepay's /embedded/ app.
+ * Requires both the tracker token and a TBT.
  */
 export function buildCheckoutUrl(
   tracker: string,
@@ -67,16 +66,16 @@ export function buildCheckoutUrl(
   redirectUrl: string,
   cancelUrl: string
 ): string {
-  const env = process.env.SAFEPAY_ENV === "production" ? "production" : "sandbox";
+  const environment = process.env.SAFEPAY_ENV === "production" ? "production" : "sandbox";
   const params = new URLSearchParams({
-    env,
-    tbt,
+    environment,
     tracker,
+    tbt,
     source: "hosted",
     redirect_url: redirectUrl,
     cancel_url: cancelUrl,
   });
-  return `${HOST}/checkout?${params.toString()}`;
+  return `${HOST}/embedded/?${params.toString()}`;
 }
 
 /**
@@ -87,20 +86,20 @@ export async function verifyPayment(
   tracker: string
 ): Promise<{ succeeded: boolean; reference?: string }> {
   const res = await fetch(`${HOST}/reporter/api/v1/payments/${tracker}`, {
-    headers: authHeaders(),
+    headers: merchantHeaders(),
   });
   if (!res.ok) return { succeeded: false };
   const json = await res.json();
-  const state = json.data?.tracker?.state as string | undefined;
+  // Reporter returns { data: { state, reference, ... } } — data IS the tracker object
+  const state = json.data?.state as string | undefined;
   return {
     succeeded: state === "TRACKER_ENDED",
-    reference: json.data?.tracker?.reference as string | undefined,
+    reference: json.data?.reference as string | undefined,
   };
 }
 
 /**
  * Verify the HMAC-SHA512 signature on incoming webhook payloads.
- * Uses the webhook secret from your Safepay dashboard (Developers → Endpoints).
  */
 export function verifyWebhookSignature(rawBody: string, signature: string): boolean {
   const secret = process.env.SAFEPAY_WEBHOOK_SECRET ?? "";
@@ -109,7 +108,6 @@ export function verifyWebhookSignature(rawBody: string, signature: string): bool
     return false;
   }
 
-  // Safepay sends a 128-char hex SHA-512 digest
   if (!/^[0-9a-f]{128}$/i.test(signature)) {
     console.error("[safepay] Webhook signature is not valid hex SHA-512");
     return false;

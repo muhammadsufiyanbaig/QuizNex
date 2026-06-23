@@ -4,7 +4,8 @@ import { orgTeachers, organizations, users } from "@/lib/db/schema";
 import { eq, count } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Building2, Users, UserCheck, ArrowRight } from "lucide-react";
+import { Building2, Users, UserCheck, ArrowRight, Zap } from "lucide-react";
+import { getActiveSubscription } from "@/lib/plans/subscription";
 
 export default async function OrganizationDashboard() {
   const session = await auth();
@@ -56,7 +57,21 @@ export default async function OrganizationDashboard() {
     }));
   }
 
-  const firstName = session.user.name?.split(" ")[0] ?? "Admin";
+  const firstName    = session.user.name?.split(" ")[0] ?? "Admin";
+  const subscription = await getActiveSubscription(userId, "ORGANIZATION");
+
+  const planLabel: Record<string, string> = {
+    ORG_STARTER: "Starter", ORG_GROWTH: "Growth", ORG_ENTERPRISE: "Enterprise",
+  };
+  const planColor: Record<string, string> = {
+    ORG_STARTER:    "text-blue-400 bg-blue-500/10 ring-blue-500/20",
+    ORG_GROWTH:     "text-violet-400 bg-violet-500/10 ring-violet-500/20",
+    ORG_ENTERPRISE: "text-amber-400 bg-amber-500/10 ring-amber-500/20",
+  };
+
+  const trialDaysLeft = subscription.status === "TRIAL" && subscription.trialEndsAt
+    ? Math.max(0, Math.ceil((subscription.trialEndsAt.getTime() - Date.now()) / 86_400_000))
+    : null;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
@@ -66,6 +81,45 @@ export default async function OrganizationDashboard() {
         <p className="mt-1 text-sm text-slate-400">
           {org ? org.name : "Set up your organization to get started."}
         </p>
+      </div>
+
+      {/* Plan Status */}
+      <div className="glass-card rounded-2xl p-5 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 ring-1 ring-violet-500/25">
+            <Zap className="h-5 w-5 text-violet-400" />
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 mb-0.5">Current Plan</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${planColor[subscription.plan] ?? "text-slate-400 bg-slate-500/10 ring-slate-500/20"}`}>
+                {planLabel[subscription.plan] ?? subscription.plan}
+              </span>
+              {subscription.status === "TRIAL" && trialDaysLeft !== null && (
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${
+                  trialDaysLeft <= 3
+                    ? "bg-red-500/10 text-red-400 ring-red-500/20"
+                    : "bg-amber-500/10 text-amber-400 ring-amber-500/20"
+                }`}>
+                  Trial · {trialDaysLeft}d left
+                </span>
+              )}
+              {subscription.isExpired && (
+                <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-400 ring-1 ring-red-500/20">Expired</span>
+              )}
+              {subscription.status === "ACTIVE" && subscription.currentPeriodEnd && (
+                <span className="text-xs text-slate-500">
+                  renews {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        {(subscription.isExpired || subscription.status === "TRIAL") && (
+          <Link href="/pricing" className="btn-gradient shrink-0 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-500/20">
+            {subscription.isExpired ? "Renew" : "Upgrade"}
+          </Link>
+        )}
       </div>
 
       {/* Stats */}

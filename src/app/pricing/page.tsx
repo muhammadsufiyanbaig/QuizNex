@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Zap, Check, ArrowLeft, Sparkles, Building2, GraduationCap, Loader2 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ const TEACHER_PLANS: Plan[] = [
     yearlyPkr:  null,
     ctaLabel:   "Get started free",
     features: [
-      "5 classrooms",
+      "3 classrooms",
       "2 quizzes per classroom",
       "Basic proctoring",
       "Basic analytics",
@@ -78,7 +78,7 @@ const ORG_PLANS: Plan[] = [
     name:       "Starter",
     monthlyPkr: 2499,
     yearlyPkr:  24990,
-    ctaLabel:   "Start 30-day trial",
+    ctaLabel:   "Start 15-day trial",
     features: [
       "Up to 8 teacher sub-accounts",
       "80 classrooms (org-wide)",
@@ -96,7 +96,7 @@ const ORG_PLANS: Plan[] = [
     monthlyPkr:  5999,
     yearlyPkr:   59990,
     highlighted: true,
-    ctaLabel:    "Start 30-day trial",
+    ctaLabel:    "Start 15-day trial",
     features: [
       "Up to 30 teacher sub-accounts",
       "300 classrooms (org-wide)",
@@ -112,7 +112,7 @@ const ORG_PLANS: Plan[] = [
     name:       "Enterprise",
     monthlyPkr: 13999,
     yearlyPkr:  139990,
-    ctaLabel:   "Start 30-day trial",
+    ctaLabel:   "Start 15-day trial",
     features: [
       "Unlimited teacher sub-accounts",
       "Unlimited classrooms",
@@ -129,18 +129,65 @@ const ORG_PLANS: Plan[] = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PricingPage() {
-  const router   = useRouter();
+  return (
+    <Suspense fallback={null}>
+      <PricingContent />
+    </Suspense>
+  );
+}
+
+function PricingContent() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
   const [period, setPeriod]     = useState<Period>("MONTHLY");
   const [audience, setAudience] = useState<Audience>("teacher");
   const [loading, setLoading]   = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const plans = audience === "teacher" ? TEACHER_PLANS : ORG_PLANS;
+
+  // Auto-trigger checkout when redirected back after auth
+  useEffect(() => {
+    const pendingPlan   = searchParams.get("checkout");
+    const pendingPeriod = (searchParams.get("period") ?? "MONTHLY") as Period;
+    if (!pendingPlan || pendingPlan === "FREE") return;
+
+    const allPlans = [...TEACHER_PLANS, ...ORG_PLANS];
+    const plan = allPlans.find((p) => p.key === pendingPlan);
+    if (!plan) return;
+
+    if (pendingPlan.startsWith("ORG_")) setAudience("org");
+    setPeriod(pendingPeriod);
+    setLoading(pendingPlan);
+
+    fetch("/api/payments/checkout", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ plan: pendingPlan, period: pendingPeriod }),
+    })
+      .then(async (res) => {
+        if (res.status === 401) {
+          router.push(`/register?callbackUrl=${encodeURIComponent(`/pricing?checkout=${pendingPlan}&period=${pendingPeriod}`)}`);
+          return;
+        }
+        const data = await res.json();
+        if (data.checkoutUrl) {
+          window.location.assign(data.checkoutUrl);
+        } else {
+          setCheckoutError(data.error ?? "Payment session failed. Please try again.");
+        }
+      })
+      .catch(() => setCheckoutError("Network error. Please check your connection."))
+      .finally(() => setLoading(null));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubscribe(plan: Plan) {
     if (plan.key === "FREE") {
       router.push("/register");
       return;
     }
+    setCheckoutError(null);
     setLoading(plan.key);
     try {
       const res = await fetch("/api/payments/checkout", {
@@ -150,14 +197,18 @@ export default function PricingPage() {
       });
 
       if (res.status === 401) {
-        router.push(`/login?callbackUrl=/pricing`);
+        router.push(`/register?callbackUrl=${encodeURIComponent(`/pricing?checkout=${plan.key}&period=${period}`)}`);
         return;
       }
 
       const data = await res.json();
       if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+        window.location.assign(data.checkoutUrl);
+      } else {
+        setCheckoutError(data.error ?? "Payment session failed. Please try again.");
       }
+    } catch {
+      setCheckoutError("Network error. Please check your connection.");
     } finally {
       setLoading(null);
     }
@@ -202,6 +253,14 @@ export default function PricingPage() {
       {/* Content */}
       <main className="relative z-10 mx-auto max-w-6xl px-6 pb-24 pt-8 md:px-8">
 
+        {/* Checkout error */}
+        {checkoutError && (
+          <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-400">
+            <span>✕</span>
+            {checkoutError}
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-12 text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-1.5 text-sm text-blue-400">
@@ -244,7 +303,7 @@ export default function PricingPage() {
         {/* Org trial banner */}
         {audience === "org" && (
           <div className="mb-8 rounded-2xl border border-blue-500/20 bg-blue-500/5 px-6 py-4 text-center text-sm text-blue-300">
-            All organization plans include a <strong className="text-white">30-day free trial</strong> — no credit card required. Cancel anytime.
+            All organization plans include a <strong className="text-white">15-day free trial</strong> — no credit card required. Cancel anytime.
           </div>
         )}
 
@@ -279,13 +338,15 @@ export default function PricingPage() {
               className={`relative flex flex-col rounded-2xl p-7 transition-all duration-300 ${
                 plan.highlighted
                   ? "border border-blue-500/40 bg-blue-500/5 glow-blue"
+                  : plan.key === "FREE"
+                  ? "border border-red-500/30 bg-red-500/5"
                   : "glass-card"
               }`}
             >
               {/* Badge */}
               {plan.badge && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="rounded-full bg-gradient-to-r from-blue-600 to-blue-400 px-3 py-1 text-xs font-semibold text-white shadow-lg shadow-blue-500/30">
+                  <span className="rounded-full bg-linear-to-r from-blue-600 to-blue-400 px-3 py-1 text-xs font-semibold text-white shadow-lg shadow-blue-500/30">
                     {plan.badge}
                   </span>
                 </div>

@@ -15,7 +15,7 @@ export interface PlanLimits {
 
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   FREE: {
-    classrooms:          5,
+    classrooms:          3,
     quizzesPerClassroom: 2,
     aiEnabled:           false,
     teacherSubAccounts:  0,

@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { payments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { createPaymentSession, getAuthToken, buildCheckoutUrl } from "@/lib/payments/safepay";
+import { createPaymentSession, createTBT, buildCheckoutUrl } from "@/lib/payments/safepay";
 import { getPlanPrice, type Plan } from "@/lib/plans/limits";
 
 const schema = z.object({
@@ -51,17 +51,15 @@ export async function POST(req: NextRequest) {
     status:       "PENDING",
   });
 
-  // Step 2: Create Safepay session
+  // Step 2: Create Safepay tracker + TBT
   let trackerToken: string;
+  let tbt: string;
   try {
-    trackerToken = await createPaymentSession(amountPkr, {
-      payment_id: paymentId,
-      user_id:    session.user.id,
-      plan,
-      period,
-    });
+    [trackerToken, tbt] = await Promise.all([
+      createPaymentSession(amountPkr),
+      createTBT(),
+    ]);
   } catch (err) {
-    // Rollback the pending row — no Safepay session was created
     await db.update(payments).set({ status: "FAILED" }).where(eq(payments.id, paymentId));
     console.error("[payments/checkout] Safepay session creation failed:", err);
     return NextResponse.json({ error: "Failed to create payment session" }, { status: 502 });
@@ -73,12 +71,10 @@ export async function POST(req: NextRequest) {
     .set({ trackerToken, updatedAt: new Date() })
     .where(eq(payments.id, paymentId));
 
-  const tbt = await getAuthToken();
-
   const checkoutUrl = buildCheckoutUrl(
     trackerToken,
     tbt,
-    `${appUrl}/payments/success?tracker=${trackerToken}`,
+    `${appUrl}/payments/success`,
     `${appUrl}/payments/cancel`
   );
 

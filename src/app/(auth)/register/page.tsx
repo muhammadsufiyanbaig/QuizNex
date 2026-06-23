@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import {
@@ -59,7 +59,9 @@ const ROLES: {
 ];
 
 export default function RegisterPage() {
-  const router = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl  = searchParams.get("callbackUrl") ?? "/login?registered=true";
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -78,6 +80,22 @@ export default function RegisterPage() {
 
   const selectedRole = watch("role");
 
+  // Pre-select role from pending plan in callbackUrl
+  useEffect(() => {
+    try {
+      const url = new URL(callbackUrl, "http://x");
+      const pendingPlan = url.searchParams.get("checkout") ?? "";
+      if (pendingPlan.startsWith("ORG_")) {
+        setValue("role", "ORGANIZATION", { shouldValidate: true });
+      } else if (pendingPlan && pendingPlan !== "FREE") {
+        setValue("role", "TEACHER", { shouldValidate: true });
+      }
+    } catch {
+      // callbackUrl not a valid URL path — ignore
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function onSubmit(data: RegisterInput) {
     setServerError(null);
     try {
@@ -94,11 +112,9 @@ export default function RegisterPage() {
       }
 
       if (json.requiresVerification) {
-        // Email service is configured — redirect to OTP verification page
-        router.push(`/verify-email?email=${encodeURIComponent(json.email)}`);
+        router.push(`/verify-email?email=${encodeURIComponent(json.email)}&callbackUrl=${encodeURIComponent(callbackUrl)}`);
       } else {
-        // Auto-verified (no email service) — go straight to login
-        router.push("/login?registered=true");
+        router.push(callbackUrl === "/login?registered=true" ? "/login?registered=true" : callbackUrl);
       }
     } catch {
       setServerError("Network error. Please check your connection.");

@@ -16,7 +16,8 @@ const planLabel: Record<string, string> = {
 function SuccessContent() {
   const searchParams = useSearchParams();
   const router       = useRouter();
-  const tracker      = searchParams.get("tracker");
+  // Safepay embedded sends "tracker" in form POST and "tracker_token" in link redirect
+  const tracker = searchParams.get("tracker") ?? searchParams.get("tracker_token");
 
   const [state, setState] = useState<"verifying" | "success" | "failed">("verifying");
   const [plan, setPlan]   = useState<string | null>(null);
@@ -24,18 +25,29 @@ function SuccessContent() {
   useEffect(() => {
     if (!tracker) { setState("failed"); return; }
 
-    fetch(`/api/payments/verify?tracker=${encodeURIComponent(tracker)}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.success) {
-          setPlan(data.plan ?? null);
-          setState("success");
-          setTimeout(() => router.push("/"), 3000);
-        } else {
-          setState("failed");
-        }
-      })
-      .catch(() => setState("failed"));
+    // Poll up to 6 times (12 s total) — Safepay may redirect before state updates
+    let attempts = 0;
+    const poll = () => {
+      fetch(`/api/payments/verify?tracker=${encodeURIComponent(tracker)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            setPlan(data.plan ?? null);
+            setState("success");
+            setTimeout(() => router.push("/"), 3000);
+          } else if (attempts < 5) {
+            attempts++;
+            setTimeout(poll, 2000);
+          } else {
+            setState("failed");
+          }
+        })
+        .catch(() => {
+          if (attempts < 5) { attempts++; setTimeout(poll, 2000); }
+          else setState("failed");
+        });
+    };
+    poll();
   }, [tracker, router]);
 
   return (

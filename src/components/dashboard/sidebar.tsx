@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   BarChart2,
@@ -11,7 +11,6 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
-  Settings,
   ShieldCheck,
   UserRound,
   Users,
@@ -21,6 +20,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { Role } from "@/types/auth";
+import type { ActiveSubscription } from "@/lib/plans/subscription";
+type Sub = Pick<ActiveSubscription, "plan" | "status" | "isExpired" | "trialEndsAt">;
 
 type NavItem = {
   label: string;
@@ -95,7 +96,20 @@ function NavLink({ item, pathname, onClick }: { item: NavItem; pathname: string;
   );
 }
 
-export default function Sidebar({ user }: { user: SidebarUser }) {
+const PLAN_LABEL: Record<string, string> = {
+  FREE: "Free", GOLD: "Gold", PLATINUM: "Platinum",
+  ORG_STARTER: "Starter", ORG_GROWTH: "Growth", ORG_ENTERPRISE: "Enterprise",
+};
+const PLAN_COLOR: Record<string, string> = {
+  FREE:           "bg-red-500/15 text-red-400 ring-red-500/25",
+  GOLD:           "bg-yellow-500/15 text-yellow-400 ring-yellow-500/25",
+  PLATINUM:       "bg-cyan-500/15 text-cyan-400 ring-cyan-500/25",
+  ORG_STARTER:    "bg-blue-500/15 text-blue-400 ring-blue-500/25",
+  ORG_GROWTH:     "bg-violet-500/15 text-violet-400 ring-violet-500/25",
+  ORG_ENTERPRISE: "bg-amber-500/15 text-amber-400 ring-amber-500/25",
+};
+
+export default function Sidebar({ user, subscription }: { user: SidebarUser; subscription?: Sub | null }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navItems = getNavItems((user.role as Role | null) ?? null);
@@ -146,11 +160,23 @@ export default function Sidebar({ user }: { user: SidebarUser }) {
           </div>
         </div>
         {user.role && (
-          <div className="flex items-center gap-2 rounded-xl px-3 py-1.5">
+          <div className="flex items-center gap-2 rounded-xl px-3 py-1.5 flex-wrap">
             {getRoleIcon(user.role as Role)}
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getRoleBadgeClass(user.role as Role)}`}>
               {user.role.charAt(0) + user.role.slice(1).toLowerCase()}
             </span>
+            {subscription && (
+              <Link
+                href="/pricing"
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 transition-opacity hover:opacity-80 ${PLAN_COLOR[subscription.plan] ?? PLAN_COLOR.FREE}`}
+              >
+                {subscription.isExpired
+                  ? "Expired"
+                  : subscription.status === "TRIAL"
+                  ? `Trial · ${Math.max(0, Math.ceil(((subscription.trialEndsAt?.getTime() ?? 0) - Date.now()) / 86_400_000))}d`
+                  : (PLAN_LABEL[subscription.plan] ?? subscription.plan)}
+              </Link>
+            )}
           </div>
         )}
         <button

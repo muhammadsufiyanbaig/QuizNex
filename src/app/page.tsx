@@ -6,7 +6,7 @@ import {
   Zap, Brain, Shield, BarChart3, Users, BookOpen,
   ArrowRight, GraduationCap, Building2, Sparkles,
   Eye, Clock, CheckCircle, Menu, X, ChevronRight,
-  FileText, Lock, Trophy, Wifi,
+  Trophy, Wifi,
 } from "lucide-react";
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
@@ -42,11 +42,11 @@ function Navbar() {
             { label: "Features",  href: "#features"  },
             { label: "How It Works", href: "#how"   },
             { label: "Roles",     href: "#roles"     },
+            { label: "Pricing",   href: "/pricing"   },
           ].map(({ label, href }) => (
-            <a key={label} href={href}
-              className="text-white/60 hover:text-white transition-colors duration-200">
-              {label}
-            </a>
+            href.startsWith("/")
+              ? <Link key={label} href={href} className="text-white/60 hover:text-white transition-colors duration-200">{label}</Link>
+              : <a key={label} href={href} className="text-white/60 hover:text-white transition-colors duration-200">{label}</a>
           ))}
         </nav>
 
@@ -56,7 +56,7 @@ function Navbar() {
             className="px-4 py-2 text-sm font-medium text-white/70 hover:text-white transition-colors">
             Sign in
           </Link>
-          <Link href="/register"
+          <Link href="/pricing"
             className="btn-gradient px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-lg shadow-blue-500/25">
             Get started free
           </Link>
@@ -76,9 +76,10 @@ function Navbar() {
             <a key={label} href={href} onClick={() => setOpen(false)}
               className="block py-2 text-sm text-white/70 hover:text-white transition-colors">{label}</a>
           ))}
+          <Link href="/pricing" onClick={() => setOpen(false)} className="block py-2 text-sm text-white/70 hover:text-white transition-colors">Pricing</Link>
           <div className="pt-2 flex flex-col gap-2">
             <Link href="/login" className="py-2.5 text-center text-sm font-medium text-white/70 hover:text-white border border-white/10 rounded-xl transition-colors">Sign in</Link>
-            <Link href="/register" className="btn-gradient py-2.5 text-center text-sm font-semibold text-white rounded-xl">Get started free</Link>
+            <Link href="/pricing" className="btn-gradient py-2.5 text-center text-sm font-semibold text-white rounded-xl">Get started free</Link>
           </div>
         </div>
       )}
@@ -130,7 +131,7 @@ function Hero() {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
-          <Link href="/register"
+          <Link href="/pricing"
             className="btn-gradient flex items-center gap-2 px-8 py-4 rounded-2xl text-base font-semibold text-white shadow-xl shadow-blue-500/30">
             Start for free
             <ArrowRight className="h-4 w-4" />
@@ -420,8 +421,8 @@ const ROLES = [
     title: "For Teachers",
     desc: "Create AI-powered quizzes in seconds, manage multiple classrooms, proctor live, and export analytics reports.",
     perks: ["AI quiz from topic or document", "Live proctoring dashboard", "CSV analytics export"],
-    cta: "Start teaching",
-    href: "/register",
+    cta: "View teacher plans",
+    href: "/pricing",
     featured: true,
   },
   {
@@ -435,8 +436,8 @@ const ROLES = [
     title: "For Organizations",
     desc: "Oversee all teachers and classrooms under your institution. Access platform-wide analytics and manage at scale.",
     perks: ["Institution-wide analytics", "Teacher oversight panel", "Bulk student management"],
-    cta: "Set up org",
-    href: "/register",
+    cta: "View org plans",
+    href: "/pricing",
   },
 ];
 
@@ -457,7 +458,7 @@ function Roles() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {ROLES.map(({ icon: Icon, gradient, border, iconBg, iconColor, badge, badgeColor, title, desc, perks, cta, href, featured }) => (
+          {ROLES.map(({ icon: Icon, border, iconBg, iconColor, badge, badgeColor, title, desc, perks, cta, href, featured }) => (
             <div key={title}
               className={`relative rounded-2xl border p-8 transition-all duration-300 ${border} ${
                 featured ? "bg-gradient-to-b from-indigo-500/10 to-transparent shadow-xl shadow-indigo-500/10 scale-[1.02]" : "bg-white/2 hover:bg-white/4"
@@ -526,7 +527,7 @@ function CTA() {
               Join teachers and students who use QuizNex to run smarter, fairer assessments.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/register"
+              <Link href="/pricing"
                 className="btn-gradient flex items-center gap-2 px-10 py-4 rounded-2xl text-base font-semibold text-white shadow-xl shadow-blue-500/30">
                 Get started for free
                 <ArrowRight className="h-4 w-4" />
@@ -572,9 +573,13 @@ function Footer() {
                 { label: "Features",    href: "#features" },
                 { label: "How it works",href: "#how"      },
                 { label: "Roles",       href: "#roles"    },
+                { label: "Pricing",     href: "/pricing"  },
               ].map(({ label, href }) => (
                 <li key={label}>
-                  <a href={href} className="text-sm text-white/40 hover:text-white/70 transition-colors">{label}</a>
+                  {href.startsWith("/")
+                    ? <Link href={href} className="text-sm text-white/40 hover:text-white/70 transition-colors">{label}</Link>
+                    : <a href={href} className="text-sm text-white/40 hover:text-white/70 transition-colors">{label}</a>
+                  }
                 </li>
               ))}
             </ul>

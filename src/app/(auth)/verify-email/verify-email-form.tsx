@@ -11,6 +11,7 @@ export default function VerifyEmailForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const email        = searchParams.get("email") ?? "";
+  const callbackUrl  = searchParams.get("callbackUrl") ?? "";
 
   const [digits, setDigits]         = useState<string[]>(Array(OTP_LENGTH).fill(""));
   const [error, setError]           = useState<string | null>(null);
@@ -45,9 +46,12 @@ export default function VerifyEmailForm() {
   // Redirect after success
   useEffect(() => {
     if (!verified) return;
-    const id = setTimeout(() => router.push("/login?verified=true"), 2000);
+    const loginUrl = callbackUrl
+      ? `/login?verified=true&callbackUrl=${encodeURIComponent(callbackUrl)}`
+      : "/login?verified=true";
+    const id = setTimeout(() => router.push(loginUrl), 2000);
     return () => clearTimeout(id);
-  }, [verified, router]);
+  }, [verified, router, callbackUrl]);
 
   async function handleVerify(otp: string) {
     if (submitting || otp.length !== OTP_LENGTH) return;

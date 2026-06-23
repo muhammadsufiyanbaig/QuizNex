@@ -4,6 +4,7 @@ import { organizations, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import OrgProfileClient from "./org-profile-client";
+import { getActiveSubscription } from "@/lib/plans/subscription";
 
 export default async function OrgProfilePage() {
   const session = await auth();
@@ -23,10 +24,20 @@ export default async function OrgProfilePage() {
     .where(eq(organizations.userId, session.user.id))
     .limit(1);
 
+  const sub = await getActiveSubscription(session.user.id, "ORGANIZATION");
+  const subscription = {
+    plan:             sub.plan,
+    status:           sub.status,
+    isExpired:        sub.isExpired,
+    trialEndsAt:      sub.trialEndsAt?.toISOString() ?? null,
+    currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
+  };
+
   return (
     <OrgProfileClient
       user={{ name: user.name, email: user.email, twoFactorEnabled: user.twoFactorEnabled, createdAt: user.createdAt }}
       org={org ?? null}
+      subscription={subscription}
     />
   );
 }

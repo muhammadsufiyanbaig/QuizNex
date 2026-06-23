@@ -3,8 +3,29 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  Building2, Check, Loader2, Pencil, ShieldCheck, ShieldAlert, X,
+  Building2, Check, Loader2, Pencil, ShieldCheck, ShieldAlert, X, Zap,
 } from "lucide-react";
+
+type SubProp = {
+  plan: string;
+  status: string;
+  isExpired: boolean;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+};
+
+const PLAN_LABEL: Record<string, string> = {
+  FREE: "Free", GOLD: "Gold", PLATINUM: "Platinum",
+  ORG_STARTER: "Starter", ORG_GROWTH: "Growth", ORG_ENTERPRISE: "Enterprise",
+};
+const PLAN_COLOR: Record<string, string> = {
+  FREE:           "bg-red-500/15 text-red-400 ring-red-500/25",
+  GOLD:           "bg-yellow-500/15 text-yellow-400 ring-yellow-500/25",
+  PLATINUM:       "bg-cyan-500/15 text-cyan-400 ring-cyan-500/25",
+  ORG_STARTER:    "bg-blue-500/15 text-blue-400 ring-blue-500/25",
+  ORG_GROWTH:     "bg-violet-500/15 text-violet-400 ring-violet-500/25",
+  ORG_ENTERPRISE: "bg-amber-500/15 text-amber-400 ring-amber-500/25",
+};
 
 type OrgData = {
   id: string;
@@ -17,9 +38,10 @@ type OrgData = {
 type Props = {
   user: { name: string; email: string; twoFactorEnabled: boolean; createdAt: Date };
   org: OrgData | null;
+  subscription?: SubProp | null;
 };
 
-export default function OrgProfileClient({ user, org: initialOrg }: Props) {
+export default function OrgProfileClient({ user, org: initialOrg, subscription }: Props) {
   const [org, setOrg] = useState<OrgData | null>(initialOrg);
 
   // Org fields editing
@@ -123,6 +145,48 @@ export default function OrgProfileClient({ user, org: initialOrg }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Plan status */}
+      {subscription && (
+        <div className="glass-card rounded-2xl p-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 ring-1 ring-violet-500/25">
+              <Zap className="h-5 w-5 text-violet-400" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-0.5">Current Plan</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${PLAN_COLOR[subscription.plan] ?? "bg-slate-500/15 text-slate-400 ring-slate-500/25"}`}>
+                  {PLAN_LABEL[subscription.plan] ?? subscription.plan}
+                </span>
+                {subscription.status === "TRIAL" && subscription.trialEndsAt && (
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${
+                    Math.max(0, Math.ceil((new Date(subscription.trialEndsAt).getTime() - Date.now()) / 86_400_000)) <= 3
+                      ? "bg-red-500/10 text-red-400 ring-red-500/20"
+                      : "bg-amber-500/10 text-amber-400 ring-amber-500/20"
+                  }`}>
+                    Trial · {Math.max(0, Math.ceil((new Date(subscription.trialEndsAt).getTime() - Date.now()) / 86_400_000))}d left
+                  </span>
+                )}
+                {subscription.isExpired && (
+                  <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-400 ring-1 ring-red-500/20">Expired</span>
+                )}
+                {subscription.status === "ACTIVE" && subscription.currentPeriodEnd && (
+                  <span className="text-xs text-slate-500">
+                    renews {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <Link
+            href="/pricing"
+            className="btn-gradient shrink-0 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-500/20"
+          >
+            {subscription.isExpired ? "Renew" : "Upgrade"}
+          </Link>
+        </div>
+      )}
 
       {/* Organization details */}
       <div className="glass-card rounded-2xl p-6">
