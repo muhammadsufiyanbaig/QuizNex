@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { quizzes, classroomStudents, quizAttempts } from "@/lib/db/schema";
+import { quizzes, classroomStudents, quizAttempts, requizRequests } from "@/lib/db/schema";
 import { and, eq, count, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -57,8 +57,30 @@ export async function POST(req: Request) {
       eq(quizAttempts.studentId, studentId),
       inArray(quizAttempts.status, ["SUBMITTED", "AUTO_SUBMITTED", "FLAGGED"])
     ));
+
   if (Number(used) >= quiz.maxAttempts) {
-    return NextResponse.json({ error: "Maximum attempts reached for this quiz" }, { status: 409 });
+    // Check for teacher-approved re-quiz request
+    const [approved] = await db
+      .select({ id: requizRequests.id })
+      .from(requizRequests)
+      .where(
+        and(
+          eq(requizRequests.quizId,    quizId),
+          eq(requizRequests.studentId, studentId),
+          eq(requizRequests.status,    "APPROVED")
+        )
+      )
+      .limit(1);
+
+    if (!approved) {
+      return NextResponse.json({ error: "Maximum attempts reached for this quiz" }, { status: 409 });
+    }
+
+    // Consume the approved request so it can't be reused
+    await db
+      .update(requizRequests)
+      .set({ status: "DENIED", reviewedAt: new Date(), updatedAt: new Date() })
+      .where(eq(requizRequests.id, approved.id));
   }
 
   // Create new attempt

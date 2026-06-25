@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { useQuizSessionStore } from "@/store/quiz-session.store";
 import type { FaceLandmarksDetector } from "@tensorflow-models/face-landmarks-detection";
@@ -16,6 +17,7 @@ import {
   EyeOff,
   Loader2,
   Maximize,
+  Send,
   Shield,
   X,
   ZapOff,
@@ -49,7 +51,7 @@ type ExistingAttempt = {
   answers:          Record<string, { selectedOptionId?: string; textAnswer?: string; timeTakenSecs: number }>;
 };
 
-type Phase = "camera-check" | "countdown" | "quiz" | "paused" | "submitting";
+type Phase = "camera-check" | "countdown" | "quiz" | "ended_violation" | "submitting";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -93,26 +95,28 @@ export default function QuizSessionClient({
   } = useQuizSessionStore();
 
   // ── Local state ─────────────────────────────────────────────────────────────
-  const [phase, setPhase]                 = useState<Phase>("camera-check");
-  const [countdown, setCountdown]         = useState(3);
-  const [cameraGranted, setCameraGranted] = useState(false);
-  const [cameraError, setCameraError]     = useState("");
-  const [startError, setStartError]       = useState("");
-  const [showConfirm, setShowConfirm]     = useState(false);
-  const [submitError, setSubmitError]     = useState("");
-  const [gazeWarning, setGazeWarning]     = useState(false);
+  const [phase, setPhase]                   = useState<Phase>("camera-check");
+  const [countdown, setCountdown]           = useState(3);
+  const [cameraGranted, setCameraGranted]   = useState(false);
+  const [cameraError, setCameraError]       = useState("");
+  const [startError, setStartError]         = useState("");
+  const [showConfirm, setShowConfirm]       = useState(false);
+  const [submitError, setSubmitError]       = useState("");
+  const [gazeWarning, setGazeWarning]       = useState(false);
+  const [violationReason, setViolationReason] = useState("");
+  const [requizSent, setRequizSent]         = useState(false);
+  const [requizError, setRequizError]       = useState("");
+  const [requizLoading, setRequizLoading]   = useState(false);
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   const videoRef            = useRef<HTMLVideoElement>(null);
   const streamRef           = useRef<MediaStream | null>(null);
   const attemptIdRef        = useRef(existingAttempt?.id ?? "");
   const elapsedRef          = useRef(existingAttempt?.timerElapsedSecs ?? 0);
-
-  // ── Phase 4: localStorage key helper ────────────────────────────────────────
   const lsKey = () => attemptIdRef.current ? `quiznex_answers_${attemptIdRef.current}` : null;
   const pausedRef           = useRef(false);
   const isSubmittingRef     = useRef(false);
-  const gazeTimestamps      = useRef<number[]>([]);
+  const gazeViolationCount  = useRef(0);
   const qaDebounceRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const questionStartRef    = useRef(Date.now());
   const gazeWarnTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -121,12 +125,12 @@ export default function QuizSessionClient({
   // ── Computed ─────────────────────────────────────────────────────────────────
   const timeLimitSecs      = quiz.timeLimitMins * 60;
   const timeRemainingStore = timeLimitSecs - timerElapsedSecs;
-  const isTimeLow          = timeRemainingStore < 300; // < 5 min
+  const isTimeLow          = timeRemainingStore < 300;
   const currentQ           = questions[currentQuestionIndex];
   const currentAnswer      = currentQ ? answers[currentQ.id] : undefined;
   const unansweredCount    = questions.filter((q) => !answers[q.id]?.selectedOptionId && !answers[q.id]?.textAnswer).length;
 
-  // ── Phase 4: save answers to localStorage on every change ───────────────────
+  // ── Save answers to localStorage on every change ─────────────────────────────
   useEffect(() => {
     const key = lsKey();
     if (!key || phase !== "quiz") return;
@@ -136,14 +140,13 @@ export default function QuizSessionClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, phase]);
 
-  // ── Phase 4: on mount, merge cached answers (server wins on conflict) ────────
+  // ── On mount, merge cached answers (server wins on conflict) ─────────────────
   useEffect(() => {
     if (!existingAttempt?.id) return;
     try {
       const cached = localStorage.getItem(`quiznex_answers_${existingAttempt.id}`);
       if (!cached) return;
       const parsed = JSON.parse(cached) as typeof answers;
-      // Merge: cached first, then override with server answers
       for (const [qId, ans] of Object.entries(parsed)) {
         if (!existingAttempt.answers[qId]) {
           setAnswer(qId, ans);
@@ -175,7 +178,6 @@ export default function QuizSessionClient({
     }
   }
 
-  // Attach stream to video element once granted
   useEffect(() => {
     if (cameraGranted && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
@@ -186,7 +188,6 @@ export default function QuizSessionClient({
   async function handleStart() {
     setStartError("");
 
-    // Enter fullscreen (needs user gesture from button click)
     try {
       await document.documentElement.requestFullscreen();
     } catch {
@@ -194,7 +195,6 @@ export default function QuizSessionClient({
     }
 
     if (existingAttempt) {
-      // Resume: restore state from server-loaded data
       attemptIdRef.current = existingAttempt.id;
       elapsedRef.current   = existingAttempt.timerElapsedSecs;
       initSession(existingAttempt.id, quiz.id);
@@ -203,7 +203,6 @@ export default function QuizSessionClient({
         setAnswer(qId, ans);
       }
     } else {
-      // Create new attempt
       try {
         const res  = await fetch("/api/attempts", {
           method:  "POST",
@@ -253,10 +252,8 @@ export default function QuizSessionClient({
       if (pausedRef.current) return;
       elapsedRef.current += 1;
       tickTimer();
-      // Accumulate time on current question
       const cq = questions[useQuizSessionStore.getState().currentQuestionIndex];
       if (cq) incrementTimeTaken(cq.id, 1);
-      // Auto-submit when time runs out
       if (elapsedRef.current >= timeLimitSecs) {
         doSubmit("AUTO_SUBMITTED");
       }
@@ -282,18 +279,16 @@ export default function QuizSessionClient({
     }).catch(() => {});
   }
 
-  // ── Fullscreen listener ──────────────────────────────────────────────────────
+  // ── Fullscreen listener — exit immediately ends quiz ─────────────────────────
   useEffect(() => {
-    if (phase !== "quiz" && phase !== "paused") return;
+    if (phase !== "quiz") return;
 
     function onFsChange() {
       const isFs = !!document.fullscreenElement;
       setFullscreen(isFs);
-      if (!isFs && !pausedRef.current && !isSubmittingRef.current) {
-        pausedRef.current = true;
-        setPhase("paused");
-        syncTimer();
+      if (!isFs && !isSubmittingRef.current) {
         logEvent("FULLSCREEN_EXIT");
+        doViolationEnd("You exited fullscreen — quiz ended automatically.");
       }
     }
 
@@ -302,9 +297,9 @@ export default function QuizSessionClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // ── Key blocking ─────────────────────────────────────────────────────────────
+  // ── Key blocking: Fn keys, Escape, ALL Ctrl combos, ALL Alt combos ───────────
   useEffect(() => {
-    if (phase !== "quiz" && phase !== "paused") return;
+    if (phase !== "quiz") return;
 
     const BLOCKED = new Set([
       "F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12",
@@ -312,17 +307,31 @@ export default function QuizSessionClient({
     ]);
 
     function onKey(e: KeyboardEvent) {
+      const inInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+
+      // Block all Alt combos
+      if (e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        logEvent("KEY_BLOCKED", { key: e.key, modifier: "alt" });
+        return;
+      }
+
+      // Block all Ctrl/Meta combos except basic text-editing inside inputs
+      if (e.ctrlKey || e.metaKey) {
+        const editingKeys = ["a", "c", "v", "x", "z", "y"];
+        if (inInput && editingKeys.includes(e.key.toLowerCase())) return;
+        e.preventDefault();
+        e.stopPropagation();
+        logEvent("KEY_BLOCKED", { key: e.key, modifier: "ctrl" });
+        return;
+      }
+
+      // Block individual keys
       if (BLOCKED.has(e.key)) {
         e.preventDefault();
         e.stopPropagation();
         logEvent("KEY_BLOCKED", { key: e.key });
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && ["w","t","n","r","j"].includes(e.key.toLowerCase())) {
-        e.preventDefault();
-      }
-      if (e.ctrlKey && e.shiftKey && ["i","j","c"].includes(e.key.toLowerCase())) {
-        e.preventDefault();
       }
     }
     function onCtx(e: MouseEvent) { e.preventDefault(); }
@@ -335,14 +344,11 @@ export default function QuizSessionClient({
     };
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Tab visibility (always active as fallback) ────────────────────────────────
+  // ── Tab visibility ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== "quiz") return;
     function onVis() {
-      if (document.hidden) {
-        showGazeWarning();
-        recordGazeAway();
-      }
+      if (document.hidden) recordGazeAway();
     }
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
@@ -361,18 +367,14 @@ export default function QuizSessionClient({
       await tf.ready();
       const model = await fld.createDetector(
         fld.SupportedModels.MediaPipeFaceMesh,
-        {
-          runtime: "tfjs",
-          refineLandmarks: true,
-          maxFaces: 1,
-        }
+        { runtime: "tfjs", refineLandmarks: true, maxFaces: 1 }
       );
       if (!cancelled) faceModelRef.current = model;
     })().catch(() => {});
     return () => { cancelled = true; };
   }, [cameraGranted]);
 
-  // ── Iris gaze detection via MediaPipe FaceMesh (runs every 2 s during quiz) ──
+  // ── Iris gaze detection via MediaPipe FaceMesh (runs every 2 s) ──────────────
   useEffect(() => {
     if (phase !== "quiz") return;
 
@@ -385,26 +387,19 @@ export default function QuizSessionClient({
         const faces = await model.estimateFaces(video);
 
         if (faces.length === 0) {
-          showGazeWarning();
           recordGazeAway();
           return;
         }
 
         const kp = faces[0].keypoints;
-
-        // Iris landmark indices (only present when refineLandmarks: true)
-        // 468 = left iris center, 473 = right iris center
         const leftIris  = kp[468];
         const rightIris = kp[473];
 
         if (!leftIris || !rightIris) {
-          // refineLandmarks unavailable — face detected, treat as looking at screen
           dismissGazeWarning();
           return;
         }
 
-        // Left eye corners: 33 (outer/temporal), 133 (inner/nasal)
-        // Right eye corners: 362 (inner/nasal), 263 (outer/temporal)
         const leftOuter  = kp[33];
         const leftInner  = kp[133];
         const rightInner = kp[362];
@@ -412,7 +407,7 @@ export default function QuizSessionClient({
 
         function irisRatio(outerX: number, innerX: number, irisX: number): number {
           const eyeW = Math.abs(innerX - outerX);
-          if (eyeW < 5) return 0.5; // too small — treat as centered
+          if (eyeW < 5) return 0.5;
           return (irisX - Math.min(outerX, innerX)) / eyeW;
         }
 
@@ -420,9 +415,7 @@ export default function QuizSessionClient({
         const rightRatio = irisRatio(rightInner.x, rightOuter.x, rightIris.x);
         const avgRatio   = (leftRatio + rightRatio) / 2;
 
-        // 0.30–0.70 = iris centered in eye = looking at screen
         if (avgRatio < 0.30 || avgRatio > 0.70) {
-          showGazeWarning();
           recordGazeAway();
         } else {
           dismissGazeWarning();
@@ -434,9 +427,9 @@ export default function QuizSessionClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // ── Phase 3: SSE — detect teacher stopping the quiz mid-session ─────────────
+  // ── SSE — detect teacher stopping the quiz mid-session ───────────────────────
   useEffect(() => {
-    if (phase !== "quiz" && phase !== "paused") return;
+    if (phase !== "quiz") return;
 
     const es = new EventSource(`/api/quizzes/${quiz.id}/stream`);
 
@@ -447,11 +440,10 @@ export default function QuizSessionClient({
           es.close();
           doSubmit("AUTO_SUBMITTED");
         }
-      } catch { /* ignore parse errors */ }
+      } catch { /* ignore */ }
     };
 
     es.onerror = () => es.close();
-
     return () => es.close();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, quiz.id]);
@@ -480,13 +472,13 @@ export default function QuizSessionClient({
 
   function recordGazeAway() {
     if (isSubmittingRef.current) return;
-    const now = Date.now();
-    gazeTimestamps.current.push(now);
-    gazeTimestamps.current = gazeTimestamps.current.filter((t) => now - t <= 60_000);
+    showGazeWarning();
+    gazeViolationCount.current += 1;
     incrementViolation();
     logEvent("GAZE_AWAY");
-    if (gazeTimestamps.current.length >= 10) {
-      doSubmit("FLAGGED", "Eye-tracking violations: ≥10 gaze-away events in 60 seconds");
+    // 3 gaze violations → end quiz
+    if (gazeViolationCount.current >= 3) {
+      doViolationEnd(`3 gaze-away violations detected — quiz ended automatically.`);
     }
   }
 
@@ -500,6 +492,56 @@ export default function QuizSessionClient({
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ type, metadata }),
     }).catch(() => {});
+  }
+
+  // ── Violation end — submits as FLAGGED, then shows re-quiz request UI ─────────
+  async function doViolationEnd(reason: string) {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    pausedRef.current = true;
+    setViolationReason(reason);
+    setPhase("submitting");
+    setStatus("FLAGGED");
+    syncTimer();
+    stopCamera();
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    try { const k = lsKey(); if (k) localStorage.removeItem(k); } catch { /* ignore */ }
+
+    await fetch(`/api/attempts/${attemptIdRef.current}/submit`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        status:           "FLAGGED",
+        timerElapsedSecs: elapsedRef.current,
+        flagReason:       reason,
+      }),
+    }).catch(() => {});
+
+    isSubmittingRef.current = false;
+    setPhase("ended_violation");
+  }
+
+  // ── Re-quiz request ──────────────────────────────────────────────────────────
+  async function handleRequizRequest() {
+    setRequizLoading(true);
+    setRequizError("");
+    try {
+      const res = await fetch(`/api/attempts/${attemptIdRef.current}/requiz-request`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ reason: violationReason }),
+      });
+      if (res.ok) {
+        setRequizSent(true);
+      } else {
+        const json = await res.json();
+        setRequizError(json.error ?? "Failed to send request.");
+      }
+    } catch {
+      setRequizError("Network error. Please try again.");
+    } finally {
+      setRequizLoading(false);
+    }
   }
 
   // ── Answer handling ──────────────────────────────────────────────────────────
@@ -542,7 +584,7 @@ export default function QuizSessionClient({
     questionStartRef.current = Date.now();
   }
 
-  // ── Submit ───────────────────────────────────────────────────────────────────
+  // ── Submit (voluntary or time-up) ────────────────────────────────────────────
   async function doSubmit(
     status: "SUBMITTED" | "AUTO_SUBMITTED" | "FLAGGED",
     flagReason?: string
@@ -555,7 +597,6 @@ export default function QuizSessionClient({
     syncTimer();
     stopCamera();
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    // Phase 4: clear localStorage buffer on submit
     try { const k = lsKey(); if (k) localStorage.removeItem(k); } catch { /* ignore */ }
 
     try {
@@ -580,14 +621,6 @@ export default function QuizSessionClient({
       pausedRef.current       = false;
       setPhase("quiz");
     }
-  }
-
-  async function resumeQuiz() {
-    try {
-      await document.documentElement.requestFullscreen();
-    } catch { /* ignore */ }
-    pausedRef.current = false;
-    setPhase("quiz");
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -629,7 +662,6 @@ export default function QuizSessionClient({
             Proctoring Setup
           </h2>
 
-          {/* Camera preview */}
           <div className="relative overflow-hidden rounded-xl bg-black/40 aspect-video flex items-center justify-center">
             {cameraGranted ? (
               <video
@@ -671,15 +703,16 @@ export default function QuizSessionClient({
           )}
         </div>
 
-        {/* Requirements list */}
+        {/* Rules */}
         <div className="glass-card rounded-2xl p-5 space-y-3">
           <h2 className="text-sm font-semibold text-white">Before you begin</h2>
           {[
-            "Your browser will enter fullscreen mode",
-            "Keep your eyes focused on the screen",
+            "Your browser will enter fullscreen mode — do NOT exit during the quiz",
+            "Exiting fullscreen will immediately end and flag your attempt",
+            "Keep your eyes on the screen at all times",
+            "3 gaze-away events will immediately end your attempt",
             "Do not switch tabs or minimize the window",
-            "Function keys and shortcuts are disabled",
-            "10 gaze-away events in 60 seconds will auto-fail your attempt",
+            "Ctrl, Alt, and function keys are disabled",
           ].map((rule) => (
             <div key={rule} className="flex items-start gap-2.5 text-xs text-slate-400">
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-400" />
@@ -725,43 +758,86 @@ export default function QuizSessionClient({
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-[#05050f]">
         <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
         <p className="text-base font-semibold text-white">Submitting your answers…</p>
-        <p className="text-sm text-slate-500">Please don't close this tab</p>
+        <p className="text-sm text-slate-500">Please don&apos;t close this tab</p>
       </div>
     );
   }
 
-  // ── Phase: quiz + paused ─────────────────────────────────────────────────────
+  // ── Phase: ended_violation ───────────────────────────────────────────────────
+  if (phase === "ended_violation") {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-[#05050f] p-4">
+        <div className="text-center space-y-3 max-w-md">
+          <div className="flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/10">
+              <ZapOff className="h-8 w-8 text-red-400" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-white">Quiz Ended</h2>
+          <p className="text-sm text-slate-400">{violationReason}</p>
+          <p className="text-xs text-slate-500">Your progress has been saved and your attempt flagged.</p>
+        </div>
+
+        {/* Re-quiz request card */}
+        <div className="glass-card w-full max-w-sm rounded-2xl p-6 space-y-4">
+          {requizSent ? (
+            <div className="text-center space-y-3 py-2">
+              <div className="flex justify-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
+                  <Check className="h-5 w-5 text-green-400" />
+                </div>
+              </div>
+              <p className="text-sm font-semibold text-white">Request sent to teacher!</p>
+              <p className="text-xs text-slate-400">
+                Your teacher will review your request. You&apos;ll be notified when approved.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Request Re-quiz</h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Ask your teacher to allow you to retake this quiz. Your teacher must approve before you can attempt it again.
+                </p>
+              </div>
+              {requizError && (
+                <p className="text-xs text-red-400">{requizError}</p>
+              )}
+              <button
+                onClick={handleRequizRequest}
+                disabled={requizLoading}
+                className="btn-gradient flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {requizLoading
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Send className="h-4 w-4" />}
+                {requizLoading ? "Sending…" : "Request Re-quiz from Teacher"}
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="flex flex-col items-center gap-2">
+          <Link
+            href={`/student/classrooms/${classroomId}/quiz/${quiz.id}/result`}
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors underline underline-offset-2"
+          >
+            View attempt results
+          </Link>
+          <Link
+            href={`/student/classrooms/${classroomId}`}
+            className="text-xs text-slate-600 hover:text-slate-400 transition-colors"
+          >
+            Back to classroom
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Phase: quiz ──────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-[#05050f]">
-
-      {/* Fullscreen-exit paused overlay */}
-      {phase === "paused" && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-[#05050f]/95">
-          <div className="text-center space-y-3">
-            <div className="flex justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10">
-                <AlertTriangle className="h-8 w-8 text-amber-400" />
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold text-white">Quiz Paused</h2>
-            <p className="text-sm text-slate-400 max-w-xs mx-auto">
-              You exited fullscreen. Your answers are saved and the timer is paused.
-              Re-enter fullscreen to continue.
-            </p>
-          </div>
-          <button
-            onClick={resumeQuiz}
-            className="btn-gradient flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20"
-          >
-            <Maximize className="h-4 w-4" />
-            Re-enter Fullscreen &amp; Resume
-          </button>
-          <p className="text-xs text-red-400 flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Each exit is logged as a violation
-          </p>
-        </div>
-      )}
 
       {/* ── Top bar ──────────────────────────────────────────────────────────── */}
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/8 bg-[#05050f] px-4 lg:px-6">
@@ -773,7 +849,6 @@ export default function QuizSessionClient({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Timer */}
           <div className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 tabular-nums text-sm font-bold ${
             isTimeLow
               ? "border-red-500/40 bg-red-500/10 text-red-400"
@@ -783,12 +858,10 @@ export default function QuizSessionClient({
             {formatTime(timeRemainingStore)}
           </div>
 
-          {/* Question counter */}
           <span className="hidden text-xs text-slate-500 sm:block">
             {currentQuestionIndex + 1} / {questions.length}
           </span>
 
-          {/* Submit */}
           <button
             onClick={() => setShowConfirm(true)}
             className="btn-gradient flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white"
@@ -799,93 +872,88 @@ export default function QuizSessionClient({
       </div>
 
       {/* ── Gaze-away warning banner ─────────────────────────────────────────── */}
-      {gazeWarning && phase === "quiz" && (
+      {gazeWarning && (
         <div className="absolute left-1/2 top-16 z-50 -translate-x-1/2 flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/20 px-4 py-2.5 text-sm font-medium text-red-300 shadow-xl backdrop-blur-sm animate-pulse pointer-events-none">
           <EyeOff className="h-4 w-4 shrink-0" />
-          Please keep your eyes on the screen!
+          Warning #{gazeViolationCount.current}: Keep your eyes on the screen! ({3 - gazeViolationCount.current} left before quiz ends)
         </div>
       )}
 
       {/* ── Question area ─────────────────────────────────────────────────────── */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 lg:px-8">
-          {currentQ && (
-            <div className="mx-auto max-w-2xl space-y-5">
-              {/* Question header */}
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-400">
-                  Q{currentQuestionIndex + 1}
-                </span>
-                <span className="text-xs text-slate-500">{currentQ.marks} mark{currentQ.marks !== 1 ? "s" : ""}</span>
-                <span className={`ml-auto rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-                  currentQ.type === "MCQ"
-                    ? "border-blue-500/25 bg-blue-500/10 text-blue-400"
-                    : "border-purple-500/25 bg-purple-500/10 text-purple-400"
-                }`}>
-                  {currentQ.type}
-                </span>
+        {currentQ && (
+          <div className="mx-auto max-w-2xl space-y-5">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-400">
+                Q{currentQuestionIndex + 1}
+              </span>
+              <span className="text-xs text-slate-500">{currentQ.marks} mark{currentQ.marks !== 1 ? "s" : ""}</span>
+              <span className={`ml-auto rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                currentQ.type === "MCQ"
+                  ? "border-blue-500/25 bg-blue-500/10 text-blue-400"
+                  : "border-purple-500/25 bg-purple-500/10 text-purple-400"
+              }`}>
+                {currentQ.type}
+              </span>
+            </div>
+
+            <p className="text-base leading-relaxed text-white">{currentQ.text}</p>
+
+            {currentQ.imageUrl && (
+              <Image
+                src={currentQ.imageUrl}
+                alt="Question image"
+                width={400}
+                height={250}
+                className="rounded-xl border border-white/10 object-contain"
+                unoptimized
+              />
+            )}
+
+            {currentQ.type === "MCQ" && (
+              <div className="space-y-2.5">
+                {currentQ.options.map((opt) => {
+                  const selected = currentAnswer?.selectedOptionId === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => handleMcqSelect(currentQ.id, opt.id)}
+                      className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition-all ${
+                        selected
+                          ? "border-blue-500/60 bg-blue-500/15 text-white"
+                          : "border-white/10 bg-white/3 text-slate-300 hover:border-white/25 hover:bg-white/5"
+                      }`}
+                    >
+                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                        selected ? "border-blue-400 bg-blue-500/30" : "border-slate-600"
+                      }`}>
+                        {selected && <span className="h-2 w-2 rounded-full bg-blue-400" />}
+                      </span>
+                      {opt.text}
+                    </button>
+                  );
+                })}
               </div>
+            )}
 
-              {/* Question text */}
-              <p className="text-base leading-relaxed text-white">{currentQ.text}</p>
+            {currentQ.type === "QA" && (
+              <textarea
+                value={currentAnswer?.textAnswer ?? ""}
+                onChange={(e) => handleQaInput(currentQ.id, e.target.value)}
+                placeholder="Type your answer here…"
+                rows={8}
+                className="input-glow w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-600 resize-none"
+              />
+            )}
+          </div>
+        )}
 
-              {/* Optional image */}
-              {currentQ.imageUrl && (
-                <Image
-                  src={currentQ.imageUrl}
-                  alt="Question image"
-                  width={400}
-                  height={250}
-                  className="rounded-xl border border-white/10 object-contain"
-                  unoptimized
-                />
-              )}
-
-              {/* MCQ options */}
-              {currentQ.type === "MCQ" && (
-                <div className="space-y-2.5">
-                  {currentQ.options.map((opt) => {
-                    const selected = currentAnswer?.selectedOptionId === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        onClick={() => handleMcqSelect(currentQ.id, opt.id)}
-                        className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition-all ${
-                          selected
-                            ? "border-blue-500/60 bg-blue-500/15 text-white"
-                            : "border-white/10 bg-white/3 text-slate-300 hover:border-white/25 hover:bg-white/5"
-                        }`}
-                      >
-                        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                          selected ? "border-blue-400 bg-blue-500/30" : "border-slate-600"
-                        }`}>
-                          {selected && <span className="h-2 w-2 rounded-full bg-blue-400" />}
-                        </span>
-                        {opt.text}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* QA textarea */}
-              {currentQ.type === "QA" && (
-                <textarea
-                  value={currentAnswer?.textAnswer ?? ""}
-                  onChange={(e) => handleQaInput(currentQ.id, e.target.value)}
-                  placeholder="Type your answer here…"
-                  rows={8}
-                  className="input-glow w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-600 resize-none"
-                />
-              )}
-            </div>
-          )}
-
-          {submitError && (
-            <div className="mx-auto mt-4 max-w-2xl rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-              {submitError}
-            </div>
-          )}
-        </div>
+        {submitError && (
+          <div className="mx-auto mt-4 max-w-2xl rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            {submitError}
+          </div>
+        )}
+      </div>
 
       {/* ── Bottom nav ────────────────────────────────────────────────────────── */}
       <div className="shrink-0 border-t border-white/8 bg-[#05050f] px-4 py-3">
@@ -899,7 +967,6 @@ export default function QuizSessionClient({
             Prev
           </button>
 
-          {/* Question palette — horizontal scroll so all buttons are always reachable */}
           <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
             {questions.map((q, idx) => {
               const ans      = answers[q.id];

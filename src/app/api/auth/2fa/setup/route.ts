@@ -38,10 +38,18 @@ export async function POST() {
   const qrCodeDataUrl = await generateQrCodeDataUrl(otpAuthUri);
 
   // Store encrypted secret (marked as not yet enabled — twoFactorEnabled stays false)
-  await db
+  const updated = await db
     .update(users)
     .set({ twoFactorSecret: encryptSecret(secret), updatedAt: new Date() })
-    .where(eq(users.id, session!.user.id));
+    .where(eq(users.id, session!.user.id))
+    .returning({ id: users.id });
+
+  if (!updated.length) {
+    return NextResponse.json(
+      { error: "Session mismatch — please sign out and sign back in." },
+      { status: 400 }
+    );
+  }
 
   return NextResponse.json({
     qrCodeDataUrl,

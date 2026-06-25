@@ -80,6 +80,14 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "ORG_INVITE_DECLINED",
   "STUDENT_REMOVED",
   "SYSTEM_ANNOUNCEMENT",
+  "REQUIZ_REQUESTED",
+  "REQUIZ_APPROVED",
+]);
+
+export const requizRequestStatusEnum = pgEnum("requiz_request_status", [
+  "PENDING",
+  "APPROVED",
+  "DENIED",
 ]);
 
 export const planEnum = pgEnum("plan", [
@@ -347,6 +355,24 @@ export const passwordResets = pgTable("password_resets", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ── RequizRequest ─────────────────────────────
+export const requizRequests = pgTable("requiz_requests", {
+  id:          uuid("id").primaryKey().defaultRandom(),
+  attemptId:   uuid("attempt_id").notNull().references(() => quizAttempts.id, { onDelete: "cascade" }),
+  studentId:   uuid("student_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  quizId:      uuid("quiz_id").notNull().references(() => quizzes.id, { onDelete: "cascade" }),
+  classroomId: uuid("classroom_id").notNull().references(() => classrooms.id, { onDelete: "cascade" }),
+  reason:      varchar("reason", { length: 255 }).notNull(),
+  status:      requizRequestStatusEnum("status").default("PENDING").notNull(),
+  reviewedAt:  timestamp("reviewed_at"),
+  createdAt:   timestamp("created_at").defaultNow().notNull(),
+  updatedAt:   timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("idx_requiz_requests_quiz_id").on(t.quizId),
+  index("idx_requiz_requests_student_id").on(t.studentId),
+  index("idx_requiz_requests_status").on(t.status),
+]);
+
 // ─────────────────────────────────────────────
 // Relations
 // ─────────────────────────────────────────────
@@ -601,4 +627,11 @@ export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
   user: one(users, { fields: [payments.userId], references: [users.id] }),
+}));
+
+export const requizRequestsRelations = relations(requizRequests, ({ one }) => ({
+  attempt:   one(quizAttempts, { fields: [requizRequests.attemptId],   references: [quizAttempts.id]  }),
+  student:   one(users,        { fields: [requizRequests.studentId],   references: [users.id]         }),
+  quiz:      one(quizzes,      { fields: [requizRequests.quizId],      references: [quizzes.id]       }),
+  classroom: one(classrooms,   { fields: [requizRequests.classroomId], references: [classrooms.id]    }),
 }));

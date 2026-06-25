@@ -32,6 +32,7 @@ import {
   BarChart2,
   ClipboardCheck,
   GripVertical,
+  RotateCcw,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -401,6 +402,14 @@ export default function QuizEditorClient({
               className="flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/8 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/15 transition-colors"
             >
               <ClipboardCheck className="h-3.5 w-3.5" /> Grade
+            </Link>
+          )}
+          {(quiz.status === "ACTIVE" || quiz.status === "COMPLETED") && (
+            <Link
+              href={`/teacher/classrooms/${classroomId}/quizzes/${quiz.id}/requiz-requests`}
+              className="flex items-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/8 px-3 py-1.5 text-xs font-medium text-violet-400 hover:bg-violet-500/15 transition-colors"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Re-quiz
             </Link>
           )}
         </div>

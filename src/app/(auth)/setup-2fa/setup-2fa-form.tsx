@@ -48,24 +48,39 @@ export default function Setup2FAForm() {
   const inputRefs    = useRef<(HTMLInputElement | null)[]>([]);
   const hasRedirected = useRef(false);
 
-  // Fetch QR code on mount
+  // Fetch QR code on mount — AbortController prevents StrictMode double-fetch
   useEffect(() => {
+    const controller = new AbortController();
+
     (async () => {
       try {
-        const res  = await fetch("/api/auth/2fa/setup", { method: "POST" });
+        const res  = await fetch("/api/auth/2fa/setup", { method: "POST", signal: controller.signal });
         const json = await res.json();
+        if (controller.signal.aborted) return;
+
         if (!res.ok) {
+          // Stale JWT: DB already has 2FA enabled but session doesn't reflect it yet
+          if (json.error === "2FA is already enabled on this account.") {
+            await update({ twoFactorEnabled: true });
+            const role = session?.user?.role ?? "STUDENT";
+            router.push(ROLE_HOME[role] ?? "/student");
+            return;
+          }
           setLoadError(json.error ?? "Failed to start 2FA setup.");
         } else {
           setSetupData({ qrCodeDataUrl: json.qrCodeDataUrl, secret: json.secret });
           setTimeout(() => inputRefs.current[0]?.focus(), 100);
         }
-      } catch {
+      } catch (err) {
+        if (controller.signal.aborted) return;
         setLoadError("Network error. Please refresh and try again.");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     })();
+
+    return () => controller.abort();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-submit when all digits filled

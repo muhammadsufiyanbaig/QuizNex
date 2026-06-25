@@ -12,7 +12,9 @@ export type NotificationType =
   | "ORG_INVITE"
   | "ORG_INVITE_ACCEPTED"
   | "ORG_INVITE_DECLINED"
-  | "STUDENT_REMOVED";
+  | "STUDENT_REMOVED"
+  | "REQUIZ_REQUESTED"
+  | "REQUIZ_APPROVED";
 
 interface CreateNotificationOptions {
   userId:    string;
