@@ -390,17 +390,24 @@ export default function QuizSessionClient({
     if (!cameraGranted) return;
     let cancelled = false;
     (async () => {
-      const [tf, fld] = await Promise.all([
-        import("@tensorflow/tfjs"),
-        import("@tensorflow-models/face-landmarks-detection"),
-      ]);
-      await tf.ready();
-      const model = await fld.createDetector(
-        fld.SupportedModels.MediaPipeFaceMesh,
-        { runtime: "tfjs", refineLandmarks: true, maxFaces: 1 }
-      );
-      if (!cancelled) faceModelRef.current = model;
-    })().catch(() => {});
+      try {
+        const [tf, fld] = await Promise.all([
+          import("@tensorflow/tfjs"),
+          import("@tensorflow-models/face-landmarks-detection"),
+        ]);
+        // Try WebGL first; fall back to CPU if unavailable
+        try { await tf.setBackend("webgl"); } catch { await tf.setBackend("cpu"); }
+        await tf.ready();
+        const model = await fld.createDetector(
+          fld.SupportedModels.MediaPipeFaceMesh,
+          // refineLandmarks:false = skip iris model download → loads ~5× faster
+          { runtime: "tfjs", refineLandmarks: false, maxFaces: 1 }
+        );
+        if (!cancelled) faceModelRef.current = model;
+      } catch (err) {
+        console.error("[FaceMesh] model load failed:", err);
+      }
+    })();
     return () => { cancelled = true; };
   }, [cameraGranted]);
 
@@ -465,6 +472,14 @@ export default function QuizSessionClient({
           ctx.arc(x, y, 1.4, 0, Math.PI * 2);
           ctx.fill();
         }
+      } else if (!faceModelRef.current) {
+        // Model still loading — show indicator
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        ctx.fillRect(0, ch - 18, cw, 18);
+        ctx.fillStyle = "rgba(100,200,255,0.9)";
+        ctx.font      = "10px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("AI scanning…", cw / 2, ch - 5);
       }
 
       animId = requestAnimationFrame(draw);
@@ -495,31 +510,25 @@ export default function QuizSessionClient({
           return;
         }
 
-        const kp = faces[0].keypoints;
-        const leftIris  = kp[468];
-        const rightIris = kp[473];
+        // Head-pose gaze: compare nose-tip x vs cheek midpoint
+        // Works without refineLandmarks (no iris keypoints needed)
+        const kp         = faces[0].keypoints;
+        const noseTip    = kp[4];    // nose tip
+        const leftCheek  = kp[234];  // left cheek
+        const rightCheek = kp[454];  // right cheek
 
-        if (!leftIris || !rightIris) {
+        if (!noseTip || !leftCheek || !rightCheek) {
           recordGazeBack();
           return;
         }
 
-        const leftOuter  = kp[33];
-        const leftInner  = kp[133];
-        const rightInner = kp[362];
-        const rightOuter = kp[263];
+        const faceWidth  = Math.abs(rightCheek.x - leftCheek.x);
+        if (faceWidth < 10) { recordGazeBack(); return; }
 
-        function irisRatio(outerX: number, innerX: number, irisX: number): number {
-          const eyeW = Math.abs(innerX - outerX);
-          if (eyeW < 5) return 0.5;
-          return (irisX - Math.min(outerX, innerX)) / eyeW;
-        }
+        // noseRatio: 0 = fully left, 0.5 = center, 1 = fully right
+        const noseRatio = (noseTip.x - leftCheek.x) / faceWidth;
 
-        const leftRatio  = irisRatio(leftOuter.x,  leftInner.x,  leftIris.x);
-        const rightRatio = irisRatio(rightInner.x, rightOuter.x, rightIris.x);
-        const avgRatio   = (leftRatio + rightRatio) / 2;
-
-        if (avgRatio < 0.30 || avgRatio > 0.70) {
+        if (noseRatio < 0.28 || noseRatio > 0.72) {
           recordGazeAway();
         } else {
           recordGazeBack();
