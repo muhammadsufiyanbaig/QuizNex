@@ -108,7 +108,10 @@ export default async function QuizResultPage({
   const timeMins = Math.floor(attempt.timerElapsedSecs / 60);
   const timeSecs = attempt.timerElapsedSecs % 60;
   const scoreNum  = attempt.totalScore ?? 0;
-  const pct       = quiz.totalMarks > 0 ? Math.round((scoreNum / quiz.totalMarks) * 100) : 0;
+  // Compute actual total from questions — quiz.totalMarks can be stale if teacher edited question marks
+  const actualTotalMarks   = questionRows.reduce((sum, q) => sum + q.marks, 0);
+  const effectiveTotalMarks = actualTotalMarks > 0 ? actualTotalMarks : quiz.totalMarks;
+  const pct = effectiveTotalMarks > 0 ? Math.round((scoreNum / effectiveTotalMarks) * 100) : 0;
 
   const STATUS_COLORS = {
     SUBMITTED:      "text-green-400 bg-green-500/10 border-green-500/25",
@@ -159,7 +162,7 @@ export default async function QuizResultPage({
               ) : (
                 <>
                   <p className="text-3xl font-bold text-white">
-                    {scoreNum} <span className="text-lg text-slate-400">/ {quiz.totalMarks}</span>
+                    {scoreNum} <span className="text-lg text-slate-400">/ {effectiveTotalMarks}</span>
                   </p>
                   <p className="text-sm text-slate-400">{pct}%</p>
                 </>
@@ -180,7 +183,7 @@ export default async function QuizResultPage({
         {/* Stats row */}
         <div className="mt-5 grid grid-cols-4 gap-3 border-t border-white/8 pt-5">
           {[
-            { icon: <BarChart2 className="h-4 w-4" />, label: "Total Marks", value: quiz.totalMarks },
+            { icon: <BarChart2 className="h-4 w-4" />, label: "Total Marks", value: effectiveTotalMarks },
             { icon: <Clock className="h-4 w-4" />, label: "Time Used", value: `${timeMins}m ${timeSecs}s` },
             { icon: <Eye className="h-4 w-4" />, label: "Gaze Events", value: Number(gazeEvents) },
             { icon: <Shield className="h-4 w-4" />, label: "FS Exits", value: Number(fsExits) },

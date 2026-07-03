@@ -124,6 +124,7 @@ export default function QuizSessionClient({
   const faceModelRef        = useRef<FaceLandmarksDetector | null>(null);
   const canvasRef           = useRef<HTMLCanvasElement>(null);
   const gazeAwayRef         = useRef(false);
+  const faceKpsRef          = useRef<Array<{ x: number; y: number }> | null>(null);
   const pendingSavesRef     = useRef(0);
 
   // ── Computed ─────────────────────────────────────────────────────────────────
@@ -403,44 +404,80 @@ export default function QuizSessionClient({
     return () => { cancelled = true; };
   }, [cameraGranted]);
 
+  // ── Canvas drawing loop — video frame + face mesh (runs every animation frame) ─
+  useEffect(() => {
+    if (!cameraGranted) return;
+
+    const FACE_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+
+    let animId: number;
+
+    function draw() {
+      const canvas = canvasRef.current;
+      const video  = videoRef.current;
+      if (!canvas || !video || video.videoWidth === 0) { animId = requestAnimationFrame(draw); return; }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { animId = requestAnimationFrame(draw); return; }
+
+      const cw = canvas.width, ch = canvas.height;
+      const vw = video.videoWidth, vh = video.videoHeight;
+
+      // Cover-fit: scale video to fill canvas, crop excess
+      const scale = Math.max(cw / vw, ch / vh);
+      const srcW  = cw / scale, srcH = ch / scale;
+      const srcX  = (vw - srcW) / 2,  srcY = (vh - srcH) / 2;
+
+      // Draw mirrored video frame
+      ctx.save();
+      ctx.translate(cw, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, cw, ch);
+      ctx.restore();
+
+      // Overlay face mesh if keypoints are available
+      const kps = faceKpsRef.current;
+      if (kps && kps.length > 0) {
+        // Map from video space → canvas space (with mirror)
+        const toC = (kp: { x: number; y: number }) => ({
+          x: cw - (kp.x - srcX) * scale, // mirror x
+          y: (kp.y - srcY) * scale,
+        });
+
+        // Face oval: filled transparent mask + outline
+        ctx.beginPath();
+        FACE_OVAL.forEach((i, idx) => {
+          const p = kps[i]; if (!p) return;
+          const { x, y } = toC(p);
+          if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.fillStyle   = "rgba(0,200,255,0.12)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0,210,255,0.85)";
+        ctx.lineWidth   = 1.5;
+        ctx.stroke();
+
+        // Landmark dots
+        ctx.fillStyle = "rgba(0,230,210,0.60)";
+        for (const kp of kps) {
+          const { x, y } = toC(kp);
+          ctx.beginPath();
+          ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      animId = requestAnimationFrame(draw);
+    }
+
+    animId = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(animId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraGranted]);
+
   // ── Iris gaze detection via MediaPipe FaceMesh (runs every 1 s) ──────────────
   useEffect(() => {
     if (phase !== "quiz") return;
-
-    // Face oval contour landmark indices (MediaPipe FaceMesh 468-point model)
-    const FACE_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
-
-    function drawMesh(faces: Awaited<ReturnType<FaceLandmarksDetector["estimateFaces"]>>) {
-      const canvas = canvasRef.current;
-      const video  = videoRef.current;
-      if (!canvas || !video) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (!faces.length) return;
-      const kps    = faces[0].keypoints;
-      const scaleX = canvas.width  / video.videoWidth;
-      const scaleY = canvas.height / video.videoHeight;
-      // Mesh dots
-      ctx.fillStyle = "rgba(0,220,200,0.45)";
-      for (const kp of kps) {
-        ctx.beginPath();
-        ctx.arc(kp.x * scaleX, kp.y * scaleY, 0.9, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // Face oval outline
-      ctx.strokeStyle = "rgba(0,200,255,0.65)";
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      FACE_OVAL.forEach((i, idx) => {
-        const p = kps[i];
-        if (!p) return;
-        if (idx === 0) ctx.moveTo(p.x * scaleX, p.y * scaleY);
-        else           ctx.lineTo(p.x * scaleX, p.y * scaleY);
-      });
-      ctx.closePath();
-      ctx.stroke();
-    }
 
     const iv = setInterval(async () => {
       const model = faceModelRef.current;
@@ -450,7 +487,8 @@ export default function QuizSessionClient({
       try {
         const faces = await model.estimateFaces(video);
 
-        drawMesh(faces);
+        // Store keypoints for canvas drawing loop
+        faceKpsRef.current = faces.length > 0 ? faces[0].keypoints : null;
 
         if (faces.length === 0) {
           recordGazeAway();
@@ -1080,20 +1118,22 @@ export default function QuizSessionClient({
 
       {/* ── Camera corner ─────────────────────────────────────────────────────── */}
       <div className="absolute bottom-16 right-4 z-30">
-        <div className="relative h-24 w-32 overflow-hidden rounded-xl border border-white/15 bg-black shadow-lg shadow-black/50">
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="h-full w-full object-cover scale-x-[-1]"
-          />
+        <div className="relative h-44 w-56 overflow-hidden rounded-xl border border-white/15 bg-black shadow-xl shadow-black/60">
+          {/* Video hidden — canvas draws frames from it via drawImage */}
+          <video ref={videoRef} autoPlay muted playsInline className="hidden" />
           <canvas
             ref={canvasRef}
-            width={128}
-            height={96}
-            className="absolute inset-0 h-full w-full scale-x-[-1] pointer-events-none"
+            width={224}
+            height={176}
+            className="h-full w-full"
           />
+          {/* Warning overlay on camera feed */}
+          {gazeWarning && (
+            <div className="absolute inset-x-0 top-0 flex items-center justify-center gap-1 bg-red-500/70 py-1 text-[10px] font-bold text-white">
+              <EyeOff className="h-3 w-3 shrink-0" />
+              Warning {gazeWarningCount}/3
+            </div>
+          )}
           <div className="absolute bottom-1 left-1 flex items-center gap-1 rounded-full bg-red-500/20 px-1.5 py-0.5 text-[9px] text-red-400">
             <span className="h-1 w-1 rounded-full bg-red-400 animate-pulse" />
             REC
