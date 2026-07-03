@@ -103,6 +103,7 @@ export default function QuizSessionClient({
   const [showConfirm, setShowConfirm]       = useState(false);
   const [submitError, setSubmitError]       = useState("");
   const [gazeWarning, setGazeWarning]       = useState(false);
+  const [gazeWarningCount, setGazeWarningCount] = useState(0);
   const [violationReason, setViolationReason] = useState("");
   const [requizSent, setRequizSent]         = useState(false);
   const [requizError, setRequizError]       = useState("");
@@ -121,6 +122,9 @@ export default function QuizSessionClient({
   const questionStartRef    = useRef(Date.now());
   const gazeWarnTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const faceModelRef        = useRef<FaceLandmarksDetector | null>(null);
+  const canvasRef           = useRef<HTMLCanvasElement>(null);
+  const gazeAwayRef         = useRef(false);
+  const pendingSavesRef     = useRef(0);
 
   // ── Computed ─────────────────────────────────────────────────────────────────
   const timeLimitSecs      = quiz.timeLimitMins * 60;
@@ -297,19 +301,27 @@ export default function QuizSessionClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // ── Key blocking: Fn keys, Escape, ALL Ctrl combos, ALL Alt combos ───────────
+  // ── Key + clipboard blocking ──────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== "quiz") return;
 
     const BLOCKED = new Set([
       "F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12",
       "Escape","Meta","ContextMenu","PrintScreen",
+      "Tab", // prevent tabbing to browser chrome or between elements
     ]);
 
     function onKey(e: KeyboardEvent) {
       const inInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
 
-      // Block all Alt combos
+      // Tab — blocked everywhere, no exceptions
+      if (e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      // Alt combos — blocked everywhere
       if (e.altKey) {
         e.preventDefault();
         e.stopPropagation();
@@ -317,30 +329,47 @@ export default function QuizSessionClient({
         return;
       }
 
-      // Block all Ctrl/Meta combos except basic text-editing inside inputs
+      // Ctrl/Meta combos — allow only undo/redo inside text inputs; block all else
+      // (this disables Ctrl+C, Ctrl+V, Ctrl+X copy/paste shortcuts)
       if (e.ctrlKey || e.metaKey) {
-        const editingKeys = ["a", "c", "v", "x", "z", "y"];
-        if (inInput && editingKeys.includes(e.key.toLowerCase())) return;
+        const k = e.key.toLowerCase();
+        if (inInput && (k === "z" || k === "y")) return; // undo / redo only
         e.preventDefault();
         e.stopPropagation();
         logEvent("KEY_BLOCKED", { key: e.key, modifier: "ctrl" });
         return;
       }
 
-      // Block individual keys
+      // Shift — block only when combined with other modifiers (Shift alone allows capitals)
+      if (e.shiftKey && (e.altKey || e.metaKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      // Individual blocked keys
       if (BLOCKED.has(e.key)) {
         e.preventDefault();
         e.stopPropagation();
         logEvent("KEY_BLOCKED", { key: e.key });
       }
     }
-    function onCtx(e: MouseEvent) { e.preventDefault(); }
 
-    document.addEventListener("keydown", onKey, true);
+    function onCtx(e: MouseEvent) { e.preventDefault(); }
+    function onClipboard(e: ClipboardEvent) { e.preventDefault(); }
+
+    document.addEventListener("keydown",     onKey,      true);
     document.addEventListener("contextmenu", onCtx);
+    document.addEventListener("copy",        onClipboard);
+    document.addEventListener("cut",         onClipboard);
+    document.addEventListener("paste",       onClipboard);
+
     return () => {
-      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("keydown",     onKey,      true);
       document.removeEventListener("contextmenu", onCtx);
+      document.removeEventListener("copy",        onClipboard);
+      document.removeEventListener("cut",         onClipboard);
+      document.removeEventListener("paste",       onClipboard);
     };
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -374,9 +403,44 @@ export default function QuizSessionClient({
     return () => { cancelled = true; };
   }, [cameraGranted]);
 
-  // ── Iris gaze detection via MediaPipe FaceMesh (runs every 2 s) ──────────────
+  // ── Iris gaze detection via MediaPipe FaceMesh (runs every 1 s) ──────────────
   useEffect(() => {
     if (phase !== "quiz") return;
+
+    // Face oval contour landmark indices (MediaPipe FaceMesh 468-point model)
+    const FACE_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+
+    function drawMesh(faces: Awaited<ReturnType<FaceLandmarksDetector["estimateFaces"]>>) {
+      const canvas = canvasRef.current;
+      const video  = videoRef.current;
+      if (!canvas || !video) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!faces.length) return;
+      const kps    = faces[0].keypoints;
+      const scaleX = canvas.width  / video.videoWidth;
+      const scaleY = canvas.height / video.videoHeight;
+      // Mesh dots
+      ctx.fillStyle = "rgba(0,220,200,0.45)";
+      for (const kp of kps) {
+        ctx.beginPath();
+        ctx.arc(kp.x * scaleX, kp.y * scaleY, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Face oval outline
+      ctx.strokeStyle = "rgba(0,200,255,0.65)";
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      FACE_OVAL.forEach((i, idx) => {
+        const p = kps[i];
+        if (!p) return;
+        if (idx === 0) ctx.moveTo(p.x * scaleX, p.y * scaleY);
+        else           ctx.lineTo(p.x * scaleX, p.y * scaleY);
+      });
+      ctx.closePath();
+      ctx.stroke();
+    }
 
     const iv = setInterval(async () => {
       const model = faceModelRef.current;
@@ -385,6 +449,8 @@ export default function QuizSessionClient({
 
       try {
         const faces = await model.estimateFaces(video);
+
+        drawMesh(faces);
 
         if (faces.length === 0) {
           recordGazeAway();
@@ -396,7 +462,7 @@ export default function QuizSessionClient({
         const rightIris = kp[473];
 
         if (!leftIris || !rightIris) {
-          dismissGazeWarning();
+          recordGazeBack();
           return;
         }
 
@@ -418,10 +484,10 @@ export default function QuizSessionClient({
         if (avgRatio < 0.30 || avgRatio > 0.70) {
           recordGazeAway();
         } else {
-          dismissGazeWarning();
+          recordGazeBack();
         }
       } catch { /* ignore transient errors */ }
-    }, 2000);
+    }, 1000);
 
     return () => clearInterval(iv);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -465,21 +531,21 @@ export default function QuizSessionClient({
     gazeWarnTimerRef.current = setTimeout(() => setGazeWarning(false), 3000);
   }
 
-  function dismissGazeWarning() {
-    if (gazeWarnTimerRef.current) clearTimeout(gazeWarnTimerRef.current);
-    setGazeWarning(false);
-  }
-
   function recordGazeAway() {
-    if (isSubmittingRef.current) return;
-    showGazeWarning();
+    if (isSubmittingRef.current || gazeAwayRef.current) return;
+    gazeAwayRef.current = true;
     gazeViolationCount.current += 1;
+    setGazeWarningCount(gazeViolationCount.current);
     incrementViolation();
     logEvent("GAZE_AWAY");
-    // 3 gaze violations → end quiz
+    showGazeWarning();
     if (gazeViolationCount.current >= 3) {
-      doViolationEnd(`3 gaze-away violations detected — quiz ended automatically.`);
+      doViolationEnd("3 gaze-away violations detected — quiz ended automatically.");
     }
+  }
+
+  function recordGazeBack() {
+    gazeAwayRef.current = false;
   }
 
   function logEvent(
@@ -548,6 +614,7 @@ export default function QuizSessionClient({
   function handleMcqSelect(questionId: string, optionId: string) {
     setAnswer(questionId, { selectedOptionId: optionId });
     if (!attemptIdRef.current) return;
+    pendingSavesRef.current++;
     fetch(`/api/attempts/${attemptIdRef.current}/answer`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -557,7 +624,9 @@ export default function QuizSessionClient({
         selectedOptionId: optionId,
         timeTakenSecs:    answers[questionId]?.timeTakenSecs ?? 0,
       }),
-    }).catch(() => {});
+    })
+    .catch(() => {})
+    .finally(() => { pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1); });
   }
 
   function handleQaInput(questionId: string, text: string) {
@@ -565,6 +634,7 @@ export default function QuizSessionClient({
     if (qaDebounceRef.current) clearTimeout(qaDebounceRef.current);
     qaDebounceRef.current = setTimeout(() => {
       if (!attemptIdRef.current) return;
+      pendingSavesRef.current++;
       fetch(`/api/attempts/${attemptIdRef.current}/answer`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -574,7 +644,9 @@ export default function QuizSessionClient({
           textAnswer:    text,
           timeTakenSecs: answers[questionId]?.timeTakenSecs ?? 0,
         }),
-      }).catch(() => {});
+      })
+      .catch(() => {})
+      .finally(() => { pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1); });
     }, 1500);
   }
 
@@ -598,6 +670,13 @@ export default function QuizSessionClient({
     stopCamera();
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     try { const k = lsKey(); if (k) localStorage.removeItem(k); } catch { /* ignore */ }
+
+    // Drain any in-flight answer saves before scoring — prevents race where
+    // last answer fires after submit reads DB (would score as 0).
+    const deadline = Date.now() + 3000;
+    while (pendingSavesRef.current > 0 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
 
     try {
       const res = await fetch(`/api/attempts/${attemptIdRef.current}/submit`, {
@@ -875,7 +954,7 @@ export default function QuizSessionClient({
       {gazeWarning && (
         <div className="absolute left-1/2 top-16 z-50 -translate-x-1/2 flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/20 px-4 py-2.5 text-sm font-medium text-red-300 shadow-xl backdrop-blur-sm animate-pulse pointer-events-none">
           <EyeOff className="h-4 w-4 shrink-0" />
-          Warning #{gazeViolationCount.current}: Keep your eyes on the screen! ({3 - gazeViolationCount.current} left before quiz ends)
+          Warning #{gazeWarningCount}: Keep your eyes on the screen! ({3 - gazeWarningCount} left before quiz ends)
         </div>
       )}
 
@@ -1008,6 +1087,12 @@ export default function QuizSessionClient({
             muted
             playsInline
             className="h-full w-full object-cover scale-x-[-1]"
+          />
+          <canvas
+            ref={canvasRef}
+            width={128}
+            height={96}
+            className="absolute inset-0 h-full w-full scale-x-[-1] pointer-events-none"
           />
           <div className="absolute bottom-1 left-1 flex items-center gap-1 rounded-full bg-red-500/20 px-1.5 py-0.5 text-[9px] text-red-400">
             <span className="h-1 w-1 rounded-full bg-red-400 animate-pulse" />

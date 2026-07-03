@@ -81,6 +81,14 @@ export async function POST(
     })
   );
 
+  // Sync quiz.totalMarks with actual sum of question marks — prevents mismatch
+  // when teacher edits individual question marks without updating quiz settings.
+  const actualTotalMarks = quizQuestions.reduce((sum, q) => sum + q.marks, 0);
+  if (actualTotalMarks > 0 && actualTotalMarks !== quiz.totalMarks) {
+    await db.update(quizzes).set({ totalMarks: actualTotalMarks }).where(eq(quizzes.id, quiz.id));
+  }
+  const effectiveTotalMarks = actualTotalMarks > 0 ? actualTotalMarks : quiz.totalMarks;
+
   // Update attempt
   const [updated] = await db
     .update(quizAttempts)
@@ -98,7 +106,7 @@ export async function POST(
   // Notify student with their result
   try {
     const scoreLine = updated.totalScore !== null
-      ? `You scored ${updated.totalScore} / ${quiz.totalMarks} (${((updated.totalScore / quiz.totalMarks) * 100).toFixed(1)}%).`
+      ? `You scored ${updated.totalScore} / ${effectiveTotalMarks} (${((updated.totalScore / effectiveTotalMarks) * 100).toFixed(1)}%).`
       : "Your answers have been submitted for review.";
     await createNotification({
       userId: session.user.id,
